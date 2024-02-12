@@ -1,0 +1,20 @@
+[package]
+name = "sandengine"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.12.1", features = ["dynamic_linking"] }
+bevy_mod_picking = { version = "0.17.0", default-features = false, features = ["backend_egui", "backend_sprite"] }
+# bevy_egui = "0.24.0" # bevy_egui is re-exported by bevy_mod_picking
+
+bitflags = "2.4.2"
+rand = "0.8.5"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
