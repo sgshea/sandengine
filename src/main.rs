@@ -1,6 +1,7 @@
 mod cell;
 mod cell_types;
 mod world;
+mod chunk;
 
 use std::time;
 
@@ -10,7 +11,7 @@ use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
 const RESOLUTION : (f32, f32) = (1920.0, 1080.0);
-const WORLD_SIZE : (i32, i32) = (1920, 1080);
+const WORLD_SIZE : (i32, i32) = (512, 512);
 const SCALE: (f32, f32) = (RESOLUTION.0 / WORLD_SIZE.0 as f32, RESOLUTION.1 / WORLD_SIZE.1 as f32);
 
 fn main() {
@@ -58,7 +59,7 @@ fn place_cells_at_pos(
     for mut sim in sim.iter_mut() {
         for x in -10..10 {
             for y in -10..10 {
-                sim.world.set_cell_checked(pos.x as i32 + x, pos.y as i32 + y, cell::Cell::cell_from_type(cell_type));
+                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, cell::Cell::cell_from_type(cell_type));
             }
         }
     }
@@ -77,7 +78,7 @@ fn setup_pixel_simulation(mut commands: Commands, mut images: ResMut<Assets<Imag
         ..default()
     }, MainCamera));
 
-    let world = world::PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1);
+    let world = world::PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1, 1.0);
 
     let mut image = Image::new(
         Extent3d {
@@ -163,7 +164,8 @@ fn render_pixel_simulation(
         let image = images.get_mut(&sim.image_handle).unwrap();
         for y in 0..WORLD_SIZE.1 as usize {
             for x in 0..WORLD_SIZE.0 as usize {
-                let cell_color = sim.world.get_cell_2d(x as i32, y as i32).get_cell_color();
+                let cell = sim.world.get_cell(x as i32, y as i32);
+                let cell_color = cell.get_cell_color();
                 let index = (x + y * WORLD_SIZE.0 as usize) * 4;
                 image.data[index] = (cell_color[0] * 255.0) as u8;
                 image.data[index + 1] = (cell_color[1] * 255.0) as u8;
