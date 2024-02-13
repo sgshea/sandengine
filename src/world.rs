@@ -1,118 +1,166 @@
+use std::sync::{Arc, Mutex};
+
+use bevy::utils::hashbrown::HashMap;
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{CellType, DirectionType}};
+use crate::{cell::Cell, cell_types::{CellType, DirectionType}, chunk::PixelChunk};
 
 pub struct PixelWorld {
     c_height: i32,
     c_width: i32,
 
-    changes: Vec<(i32, i32)>, // destination, source vector
+    scale: f32,
 
-    cells: Vec<Cell>,
+    chunks: Vec<Arc<Mutex<PixelChunk>>>,
+
+    chunks_lookup: HashMap<(i32, i32), Arc<Mutex<PixelChunk>>>
 }
 
 impl PixelWorld {
 
-    pub fn new(c_width: i32, c_height: i32) -> Self {
-        let cells = vec![Cell::empty(); (c_height * c_width) as usize];
-
-        let s = PixelWorld {
-            c_width,
-            c_height,
-            changes: Vec::new(),
-            cells,
+    pub fn new(t_width: i32, t_height: i32, scale: f32) -> Self {
+        let mut new_world = PixelWorld {
+            c_height: t_height / 8,
+            c_width: t_width / 8,
+            scale: scale,
+            chunks: Vec::new(),
+            chunks_lookup: HashMap::new()
         };
-        
-        s
+
+        // create chunks
+        for x in 0..8 {
+            for y in 0..8 {
+                new_world.create_chunk(x, y);
+            }
+        }
+
+        new_world
     }
 
-    pub fn get_all_cells(&self) -> &[Cell] {
-        &self.cells
+    pub fn get_chunk_direct(&self, x: i32, y: i32) -> Option<Arc<Mutex<PixelChunk>>> {
+        self.chunks_lookup.get(&(x, y)).map(|c| c.clone())
     }
 
-    pub fn get_cell(&self, idx: i32) -> &Cell {
-        &self.cells[idx as usize]
+    pub fn get_chunk_location(&self, x: i32, y: i32) -> (i32, i32) {
+        (x / self.c_width, y / self.c_height)
     }
 
-    pub fn get_cell_2d(&self, x: i32, y: i32) -> &Cell {
-        &self.cells[get_index(x, y, self.c_width) as usize]
+    pub fn get_chunk(&self, x: i32, y: i32) -> Option<Arc<Mutex<PixelChunk>>> {
+        let (cx, cy) = self.get_chunk_location(x, y);
+        self.get_chunk_direct(cx, cy)
+    }
+
+    fn create_chunk(&mut self, x: i32, y: i32) -> Option<Arc<Mutex<PixelChunk>>> {
+        // bounds check -10..10
+        if (x < -8 || x > 8) || (y < -8 || y > 8) {
+            return None;
+        }
+
+        let chunk = Arc::new(Mutex::new(PixelChunk::new(self.c_width, self.c_height, x, y)));
+        self.chunks.push(chunk.clone());
+        self.chunks_lookup.insert((x, y), chunk.clone());
+        Some(chunk)
     }
 
     fn in_bounds(&self, x: i32, y: i32) -> bool {
-        x < self.c_width && y < self.c_height && x >= 0 && y >= 0
+        // Check chunk
+        match self.get_chunk(x, y) {
+            Some(chunk) => {
+                let chunk = chunk.lock().unwrap();
+                chunk.in_bounds(x, y)
+            },
+            None => false
+        }
     }
 
     fn is_empty(&self, x: i32, y: i32) -> bool {
-        self.in_bounds(x, y) && self.get_cell_2d(x, y).get_cell_type() == CellType::Empty
-    }
-
-    pub fn set_cell(&mut self, x: i32, y: i32, cell: Cell) {
-        self.cells[get_index(x, y, self.c_width) as usize] = cell;
-    }
-
-    pub fn set_cell_checked(&mut self, x: i32, y: i32, cell: Cell) {
-        if self.in_bounds(x, y) {
-            self.set_cell(x, y, cell);
+        match self.get_chunk(x, y) {
+            Some(chunk) => {
+                let chunk = chunk.lock().unwrap();
+                chunk.is_empty(x, y)
+            },
+            None => false
         }
     }
 
-    fn move_cell(&mut self, x: i32, y: i32, xto: i32, yto: i32) {
-        self.changes.push(
-            (get_index(xto, yto, self.c_width), get_index(x, y, self.c_width))
-        );
+    pub fn get_cell(&self, x: i32, y: i32) -> Cell {
+        match self.get_chunk(x, y) {
+            Some(chunk) => {
+                let chunk = chunk.lock().unwrap();
+                chunk.get_cell_2d(x, y).clone()
+            },
+            None => Cell::empty()
+        }
     }
 
-    fn commit_cells(&mut self) {
-        // Remove moves that have their destinations filled
-        self.changes.retain(|(dst, _)| self.cells[*dst as usize].get_cell_type() == CellType::Empty);
+    pub fn set_cell(&self, x: i32, y: i32, cell: Cell) {
+        match self.get_chunk(x, y) {
+            Some(chunk) => {
+                let mut chunk = chunk.lock().unwrap();
+                chunk.set_cell(x, y, cell);
+            },
+            None => {}
+        }
+    }
 
-        // Sort by destination
-        self.changes.sort_by(|a, b| a.0.cmp(&b.0));
-
-        // Iterate over sorted moves and pick random source to move from each time
-        let mut iprev = 0;
-        self.changes.push((-1, -1)); // catches final move
-        for i in 0..self.changes.len() - 1 {
-            if self.changes[i + 1].0 != self.changes[i].0 {
-                let rand = iprev + rand::thread_rng().gen_range(0..=(i - iprev));
-
-                let dst = self.changes[rand].0;
-                let src = self.changes[rand].1;
-
-                self.cells[dst as usize] = self.cells[src as usize].clone();
-                self.cells[src as usize] = Cell::empty();
-                iprev = i + 1;
+    fn move_cell(&self, x: i32, y: i32, xto: i32, yto: i32) {
+        let loc_from = self.get_chunk_location(x, y);
+        let loc_to = self.get_chunk_location(xto, yto);
+        if (loc_from.0, loc_from.1) == (loc_to.0, loc_to.1) {
+            match self.get_chunk(x, y) {
+                Some(chunk) => {
+                    let mut chunk = chunk.lock().unwrap();
+                    let from_idx = chunk.get_index(x, y);
+                    chunk.move_cell((None, from_idx), xto, yto);
+                },
+                None => {}
             }
         }
-        self.changes.clear();
+        else {
+            // get both chunks
+            let chunk_from = self.get_chunk(x, y);
+            let chunk_to = self.get_chunk(xto, yto);
+            if let Some(chunk_from) = chunk_from {
+                let chunk_from_b = chunk_from.lock().unwrap();
+                let from_idx = chunk_from_b.get_index(x, y);
+                chunk_to.unwrap().lock().unwrap().move_cell((Some(chunk_from.clone()), from_idx), xto, yto);
+            }
+
+        }
     }
 
     // Update cells
     pub fn update(&mut self) {
-        for x in 0..self.c_width {
-            for y in 0..self.c_height {
-                let cell_movement = self.get_cell_2d(x, y).get_cell_movement();
 
+        for chunk in self.chunks.iter() {
+            let chunk = chunk.lock().unwrap();
+            for x in 0..self.c_width {
+                for y in 0..self.c_height {
+                    let cell_movement = chunk.get_cell_2d(x, y).get_cell_movement();
 
-                if cell_movement.is_empty() {
-                    continue;
-                }
-                else if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y) {
-                    continue;
-                }
-                else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y){
-                    continue;
-                }
-                else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y) {
-                    continue;
+                    if cell_movement.is_empty() {
+                        continue;
+                    }
+                    else if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y) {
+                        continue;
+                    }
+                    else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y){
+                        continue;
+                    }
+                    else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y) {
+                        continue;
+                    }
                 }
             }
         }
 
-        self.commit_cells();
+        for chunk in self.chunks.iter() {
+            let mut chunk = chunk.lock().unwrap();
+            chunk.commit_cells();
+        }
     }
 
-    fn move_down(&mut self, x: i32, y: i32) -> bool {
+    fn move_down(&self, x: i32, y: i32) -> bool {
         let down = self.is_empty(x, y - 1);
         if down {
             self.move_cell(x, y, x, y - 1);
@@ -120,7 +168,7 @@ impl PixelWorld {
         down
     }
 
-    fn move_diagonal(&mut self, x: i32, y: i32) -> bool {
+    fn move_diagonal(&self, x: i32, y: i32) -> bool {
         let mut down_left = self.is_empty(x - 1, y - 1);
         let mut down_right = self.is_empty(x + 1, y - 1);
         if down_left && down_right {
@@ -138,7 +186,7 @@ impl PixelWorld {
         down_left || down_right
     }
 
-    fn move_side(&mut self, x: i32, y: i32) -> bool {
+    fn move_side(&self, x: i32, y: i32) -> bool {
         let mut left = self.is_empty(x - 1, y);
         let mut right = self.is_empty(x + 1, y);
         if left && right {
@@ -155,9 +203,4 @@ impl PixelWorld {
 
         left || right
     }
-}
-
-// Calculates 1d index from 2d coordinates
-pub fn get_index(x: i32, y: i32, width: i32) -> i32 {
-    x + y * width
 }
