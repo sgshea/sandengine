@@ -46,7 +46,7 @@ impl PixelChunk {
     }
 
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
-        self.in_bounds(x, y) && self.cells[self.get_index(x, y)].get_cell_type() == CellType::Empty
+        self.cells[self.get_index(x, y)].get_cell_type() == CellType::Empty
     }
 
     pub fn get_cell(&self, idx: usize) -> &Cell {
@@ -61,7 +61,7 @@ impl PixelChunk {
             println!("Index out of bounds: {} {} {}", x, y, idx);
             println!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
         }
-        &self.cells[self.get_index(x, y)]
+        &self.cells[idx]
     }
 
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
@@ -77,12 +77,6 @@ impl PixelChunk {
         if self.in_bounds(x, y) {
             self.set_cell(x, y, cell);
         }
-    }
-
-    pub fn move_cell(&mut self, source: (Option<Arc<Mutex<PixelChunk>>>, usize), xto: i32, yto: i32) {
-        self.changes.push(
-            (source.0.clone(), source.1, self.get_index(xto, yto))
-        );
     }
 
     pub fn commit_cells(&mut self) {

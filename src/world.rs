@@ -103,53 +103,54 @@ impl PixelWorld {
         }
     }
 
-    fn move_cell(&self, x: i32, y: i32, xto: i32, yto: i32) {
-        let loc_from = self.get_chunk_location(x, y);
-        let loc_to = self.get_chunk_location(xto, yto);
-        if (loc_from.0, loc_from.1) == (loc_to.0, loc_to.1) {
-            match self.get_chunk(x, y) {
-                Some(chunk) => {
-                    let mut chunk = chunk.lock().unwrap();
-                    let from_idx = chunk.get_index(x, y);
-                    chunk.move_cell((None, from_idx), xto, yto);
-                },
-                None => {}
-            }
+    fn move_cell_diff_chunk(&self, x: i32, y: i32, xto: i32, yto: i32, chunk: &mut PixelChunk) {
+        let chunk_to = self.get_chunk(xto, yto);
+        match self.get_chunk(x, y) {
+            Some(chunk_from) => {
+                let mut chunk_from = chunk_from.lock().unwrap();
+                let from_idx = chunk_from.get_index(x, y);
+                chunk.changes.push((chunk_to, from_idx, chunk.get_index(xto, yto)));
+            },
+            None => {}
         }
-        else {
-            // get both chunks
-            let chunk_from = self.get_chunk(x, y);
-            let chunk_to = self.get_chunk(xto, yto);
-            if let Some(chunk_from) = chunk_from {
-                let chunk_from_b = chunk_from.lock().unwrap();
-                let from_idx = chunk_from_b.get_index(x, y);
-                chunk_to.unwrap().lock().unwrap().move_cell((Some(chunk_from.clone()), from_idx), xto, yto);
-            }
+    }
 
-        }
+    fn move_cell_same_chunk(&self, x: i32, y: i32, xto: i32, yto: i32, chunk: &mut PixelChunk) {
+        let from_idx = chunk.get_index(x, y);
+        chunk.changes.push((None, from_idx, chunk.get_index(xto, yto)));
+    }
+
+    fn chunk_to_world_coords(&self, chunk_pos: (i32, i32), cell_pos: (i32, i32)) -> (i32, i32) {
+        (chunk_pos.0 * self.c_width + cell_pos.0, chunk_pos.1 * self.c_height + cell_pos.1)
+    }
+
+    fn inside_chunk(&self, chunk: &PixelChunk, world_coord: (i32, i32)) -> bool {
+        return (chunk.pos_x, chunk.pos_y) == self.get_chunk_location(world_coord.0, world_coord.1)
     }
 
     // Update cells
     pub fn update(&mut self) {
 
         for chunk in self.chunks.iter() {
-            let chunk = chunk.lock().unwrap();
+            let mut chunk = chunk.lock().unwrap();
             for x in 0..self.c_width {
                 for y in 0..self.c_height {
                     let cell_movement = chunk.get_cell_2d(x, y).get_cell_movement();
 
+                    let (x, y) = self.chunk_to_world_coords((chunk.pos_x, chunk.pos_y), (x, y));
+
                     if cell_movement.is_empty() {
                         continue;
                     }
-                    else if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y) {
+                    else if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y, &mut chunk) {
                         continue;
                     }
-                    else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y){
-                        continue;
-                    }
-                    else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y) {
-                        continue;
-                    }
+                    // else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y, &mut chunk){
+                    //     continue;
+                    // }
+                    // else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y, &mut chunk) {
+                    //     continue;
+                    // }
                 }
             }
         }
@@ -160,47 +161,55 @@ impl PixelWorld {
         }
     }
 
-    fn move_down(&self, x: i32, y: i32) -> bool {
-        let down = self.is_empty(x, y - 1);
-        if down {
-            self.move_cell(x, y, x, y - 1);
+    fn move_down(&self, x: i32, y: i32, chunk: &mut PixelChunk) -> bool {
+        if self.inside_chunk(chunk, (x, y)) {
+            if chunk.is_empty(x, y - 1) {
+                self.move_cell_same_chunk(x, y, x, y - 1, chunk);
+                return true;
+            }
+            return false;
+        } else {
+            if self.is_empty(x, y - 1) {
+                self.move_cell_diff_chunk(x, y, x, y - 1, chunk);
+                return true;
+            }
+            return false;
         }
-        down
     }
 
-    fn move_diagonal(&self, x: i32, y: i32) -> bool {
-        let mut down_left = self.is_empty(x - 1, y - 1);
-        let mut down_right = self.is_empty(x + 1, y - 1);
-        if down_left && down_right {
-            down_left = rand::thread_rng().gen_bool(0.5);
-            down_right = !down_left;
-        }
+    // fn move_diagonal(&self, x: i32, y: i32, chunk: &PixelChunk) -> bool {
+    //     let mut down_left = self.is_empty(x - 1, y - 1);
+    //     let mut down_right = self.is_empty(x + 1, y - 1);
+    //     if down_left && down_right {
+    //         down_left = rand::thread_rng().gen_bool(0.5);
+    //         down_right = !down_left;
+    //     }
 
-        if down_left {
-            self.move_cell(x, y, x - 1, y - 1);
-        }
-        else if down_right {
-            self.move_cell(x, y, x + 1, y - 1);
-        }
+    //     if down_left {
+    //         self.move_cell(x, y, x - 1, y - 1);
+    //     }
+    //     else if down_right {
+    //         self.move_cell(x, y, x + 1, y - 1);
+    //     }
 
-        down_left || down_right
-    }
+    //     down_left || down_right
+    // }
 
-    fn move_side(&self, x: i32, y: i32) -> bool {
-        let mut left = self.is_empty(x - 1, y);
-        let mut right = self.is_empty(x + 1, y);
-        if left && right {
-            left = rand::thread_rng().gen_bool(0.5);
-            right = !left;
-        }
+    // fn move_side(&self, x: i32, y: i32, chunk: &PixelChunk) -> bool {
+    //     let mut left = self.is_empty(x - 1, y);
+    //     let mut right = self.is_empty(x + 1, y);
+    //     if left && right {
+    //         left = rand::thread_rng().gen_bool(0.5);
+    //         right = !left;
+    //     }
 
-        if left {
-            self.move_cell(x, y, x - 1, y);
-        }
-        else if right {
-            self.move_cell(x, y, x + 1, y);
-        }
+    //     if left {
+    //         self.move_cell(x, y, x - 1, y);
+    //     }
+    //     else if right {
+    //         self.move_cell(x, y, x + 1, y);
+    //     }
 
-        left || right
-    }
+    //     left || right
+    // }
 }
