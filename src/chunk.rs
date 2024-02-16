@@ -47,7 +47,7 @@ impl PixelChunk {
 
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
         let idx = self.get_index(x, y);
-        idx >= 0 && idx < self.cells.len() && self.cells[idx].get_cell_type() == CellType::Empty
+        idx < self.cells.len() && self.cells[idx].get_cell_type() == CellType::Empty
     }
 
     pub fn get_cell(&self, idx: usize) -> &Cell {
@@ -91,12 +91,11 @@ impl PixelChunk {
 
         // Iterate over sorted moves and pick random source to move from each time
         let mut iprev = 0;
-        // self.changes.push((-1, -1)); // catches final move
         if self.changes.len() == 0 {
             return;
         }
-        for i in 0..self.changes.len() - 1 {
-            if self.changes[i + 1].2 != self.changes[i].2 {
+        for i in 0..self.changes.len() {
+            if i == self.changes.len() - 1 || self.changes[i + 1].2 != self.changes[i].2 {
                 let rand = iprev + rand::thread_rng().gen_range(0..=(i - iprev));
 
                 let dst = self.changes[rand].2;

@@ -49,6 +49,10 @@ struct MainCamera;
 struct DebugInfo {
     pub sim_time: f32,
     pub render_construct_time: f32,
+    pub position: Vec2,
+    pub chunk_position: Vec2,
+    pub cell_position_in_chunk: Vec2,
+    pub hovered_cell: Option<cell::Cell>,
 }
 
 fn place_cells_at_pos(
@@ -56,16 +60,32 @@ fn place_cells_at_pos(
     pos: Vec2,
     cell_type: cell_types::CellType,
 ) {
-    for mut sim in sim.iter_mut() {
-        for x in -10..10 {
-            for y in -10..10 {
+    for sim in sim.iter_mut() {
+        for x in -5..5 {
+            for y in -5..5 {
                 sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, cell::Cell::cell_from_type(cell_type));
             }
         }
     }
 }
 
-fn setup_pixel_simulation(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+fn cell_at_pos_dbg(
+    mut sim: Query<&mut PixelSimulation>,
+    pos: Vec2,
+    mut dbg_info: ResMut<DebugInfo>,
+) {
+    for sim in sim.iter() {
+        dbg_info.position = pos;
+        dbg_info.chunk_position = Vec2::new((pos.x / 64.).floor(), (pos.y / 64.).floor());
+        dbg_info.cell_position_in_chunk = Vec2::new((pos.x % 64.).floor(), (pos.y % 64.).floor());
+        dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32));
+    }
+}
+
+fn setup_pixel_simulation(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    ) {
     commands.spawn((Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::Fixed {
@@ -138,9 +158,16 @@ fn setup_pixel_simulation(mut commands: Commands, mut images: ResMut<Assets<Imag
                         place_cells_at_pos(sim, cell_position, cell_types::CellType::Sand);
                     }
                 }),
+                On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>| {
+                    let event_pos = event.pointer_location.position;
+                    let cell_position = Vec2::new(
+                        event_pos.x / SCALE.0,
+                        WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
+                    );
+                    cell_at_pos_dbg(sim, cell_position, dbg_info);
+                }),
             ));
         });
-    
 }
 
 fn update_pixel_simulation(
@@ -148,9 +175,7 @@ fn update_pixel_simulation(
     mut dbg_info: ResMut<DebugInfo>,
 ) {
     let start = time::Instant::now();
-    for mut sim in query.iter_mut() {
-        sim.world.update();
-    }
+    query.iter_mut().next().unwrap().world.update();
     dbg_info.sim_time = start.elapsed().as_secs_f32();
 }
 
@@ -181,14 +206,20 @@ fn egui_ui(
     mut ctx: EguiContexts,
     dbg_info: ResMut<DebugInfo>,
 ) {
-    egui::Window::new("Debug Info").show(ctx.ctx_mut(),
+    egui::Window::new("Debug Info")
+    .show(ctx.ctx_mut(),
         |ui| {
+            ui.set_min_width(200.0);
             // convert to ms
             let sim_t_ms = dbg_info.sim_time * 1000.0;
             let render_construct_t_ms = dbg_info.render_construct_time * 1000.0;
             ui.label(format!("Sim Time: {:.2}ms", sim_t_ms));
             ui.label(format!("Render Construct Time: {:.2}ms", render_construct_t_ms));
             ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.sim_time));
+            ui.label(format!("Position: {:?}", dbg_info.position));
+            ui.label(format!("Chunk Position: {:?}", dbg_info.chunk_position));
+            ui.label(format!("Cell Position in Chunk: {:?}", dbg_info.cell_position_in_chunk));
+            ui.label(format!("Hovered Cell: {:?}", dbg_info.hovered_cell));
         }
     );
 }
