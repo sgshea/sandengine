@@ -5,14 +5,16 @@ mod chunk;
 
 use std::time;
 
-use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::{PresentMode, PrimaryWindow}};
+use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::PresentMode};
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 
-const RESOLUTION : (f32, f32) = (1920.0, 1080.0);
-const WORLD_SIZE : (i32, i32) = (512, 512);
+const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
+const WORLD_SIZE: (i32, i32) = (512, 512);
 const SCALE: (f32, f32) = (RESOLUTION.0 / WORLD_SIZE.0 as f32, RESOLUTION.1 / WORLD_SIZE.1 as f32);
+const CHUNKS: (i32, i32) = (8, 8);
+const CHUNK_SIZE: (i32, i32) = (WORLD_SIZE.0 / CHUNKS.0, WORLD_SIZE.1 / CHUNKS.1);
 
 fn main() {
     App::new()
@@ -70,14 +72,14 @@ fn place_cells_at_pos(
 }
 
 fn cell_at_pos_dbg(
-    mut sim: Query<&mut PixelSimulation>,
+    sim: Query<&mut PixelSimulation>,
     pos: Vec2,
     mut dbg_info: ResMut<DebugInfo>,
 ) {
     for sim in sim.iter() {
         dbg_info.position = pos;
-        dbg_info.chunk_position = Vec2::new((pos.x / 64.).floor(), (pos.y / 64.).floor());
-        dbg_info.cell_position_in_chunk = Vec2::new((pos.x % 64.).floor(), (pos.y % 64.).floor());
+        dbg_info.chunk_position = Vec2::new((pos.x / CHUNK_SIZE.0 as f32).floor(), (pos.y / CHUNK_SIZE.1 as f32).floor());
+        dbg_info.cell_position_in_chunk = Vec2::new((pos.x % CHUNK_SIZE.0 as f32).floor(), (pos.y % CHUNK_SIZE.1 as f32).floor());
         dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32));
     }
 }
@@ -98,7 +100,7 @@ fn setup_pixel_simulation(
         ..default()
     }, MainCamera));
 
-    let world = world::PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1, 1.0);
+    let world = world::PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1, CHUNKS.0, CHUNKS.1);
 
     let mut image = Image::new(
         Extent3d {
@@ -164,6 +166,10 @@ fn setup_pixel_simulation(
                         event_pos.x / SCALE.0,
                         WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
                     );
+                    if cell_position.x < 0. || cell_position.y < 0. || cell_position.x > WORLD_SIZE.0 as f32 || cell_position.y > WORLD_SIZE.1 as f32 {
+                        // these are invalid
+                        return;
+                    }
                     cell_at_pos_dbg(sim, cell_position, dbg_info);
                 }),
             ));

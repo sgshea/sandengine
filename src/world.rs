@@ -3,13 +3,14 @@ use std::sync::{Arc, Mutex};
 use bevy::utils::hashbrown::HashMap;
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{CellType, DirectionType}, chunk::PixelChunk};
+use crate::{cell::Cell, cell_types::DirectionType, chunk::PixelChunk};
 
 pub struct PixelWorld {
     c_height: i32,
     c_width: i32,
 
-    scale: f32,
+    chunks_x: i32,
+    chunks_y: i32,
 
     chunks: Vec<Arc<Mutex<PixelChunk>>>,
 
@@ -18,18 +19,19 @@ pub struct PixelWorld {
 
 impl PixelWorld {
 
-    pub fn new(t_width: i32, t_height: i32, scale: f32) -> Self {
+    pub fn new(t_width: i32, t_height: i32, chunks_x: i32, chunks_y: i32) -> Self {
         let mut new_world = PixelWorld {
-            c_height: t_height / 8,
-            c_width: t_width / 8,
-            scale: scale,
+            c_height: t_height / chunks_x,
+            c_width: t_width / chunks_y,
+            chunks_x,
+            chunks_y,
             chunks: Vec::new(),
             chunks_lookup: HashMap::new()
         };
 
         // create chunks
-        for x in 0..8 {
-            for y in 0..8 {
+        for x in 0..chunks_x {
+            for y in 0..chunks_y {
                 new_world.create_chunk(x, y);
             }
         }
@@ -51,11 +53,6 @@ impl PixelWorld {
     }
 
     fn create_chunk(&mut self, x: i32, y: i32) -> Option<Arc<Mutex<PixelChunk>>> {
-        // bounds check -10..10
-        if (x < -8 || x > 8) || (y < -8 || y > 8) {
-            return None;
-        }
-
         let chunk = Arc::new(Mutex::new(PixelChunk::new(self.c_width, self.c_height, x, y)));
         self.chunks.push(chunk.clone());
         self.chunks_lookup.insert((x, y), chunk.clone());
@@ -83,6 +80,11 @@ impl PixelWorld {
     }
 
     pub fn set_cell(&self, x: i32, y: i32, cell: Cell) {
+        // Check if the cell is in bounds
+        if x < 0 || x >= self.c_width * self.chunks_x || y < 0 || y >= self.c_height * self.chunks_y {
+            return;
+        }
+
         match self.get_chunk(x, y) {
             Some(chunk) => {
                 let mut chunk = chunk.lock().unwrap();
@@ -115,7 +117,7 @@ impl PixelWorld {
     }
 
     fn inside_chunk(&self, chunk: &PixelChunk, world_coord: (i32, i32)) -> bool {
-        return (chunk.pos_x, chunk.pos_y) == self.get_chunk_location(world_coord.0, world_coord.1)
+        (chunk.pos_x, chunk.pos_y) == self.get_chunk_location(world_coord.0, world_coord.1)
     }
 
     fn chunk_exists_at_world_coord(&self, x: i32, y: i32) -> bool {
