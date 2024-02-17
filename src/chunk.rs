@@ -86,7 +86,7 @@ impl PixelChunk {
         self.changes.retain(|(_, _, dst)| self.cells[*dst as usize].get_cell_type() == CellType::Empty);
 
         // Sort by destination
-        self.changes.sort_by(|a, b| a.1.cmp(&b.1));
+        self.changes.sort_by(|a, b| a.2.cmp(&b.2));
 
         // Iterate over sorted moves and pick random source to move from each time
         let mut iprev = 0;
