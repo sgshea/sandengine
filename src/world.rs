@@ -139,12 +139,12 @@ impl PixelWorld {
                     else if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y, &mut chunk) {
                         continue;
                     }
-                    // else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y, &mut chunk){
-                    //     continue;
-                    // }
-                    // else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y, &mut chunk) {
-                    //     continue;
-                    // }
+                    else if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y, &mut chunk){
+                        continue;
+                    }
+                    else if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal(x, y, &mut chunk) {
+                        continue;
+                    }
                 }
             }
         }
@@ -167,42 +167,80 @@ impl PixelWorld {
                 return true;
             }
         }
-        return false;
+        false
     }
 
-    // fn move_diagonal(&self, x: i32, y: i32, chunk: &PixelChunk) -> bool {
-    //     let mut down_left = self.is_empty(x - 1, y - 1);
-    //     let mut down_right = self.is_empty(x + 1, y - 1);
-    //     if down_left && down_right {
-    //         down_left = rand::thread_rng().gen_bool(0.5);
-    //         down_right = !down_left;
-    //     }
+    fn move_diagonal(&self, x: i32, y: i32, chunk: &mut PixelChunk) -> bool {
+        let (mut down_left, down_left_inside) = {
+            if self.inside_chunk(chunk, (x - 1, y - 1)) {
+                (chunk.is_empty(x - 1, y - 1), true)
+            } else {
+                (self.is_empty(x - 1, y - 1), false)
+            }
+        };
+        let (mut down_right, down_right_inside) = {
+            if self.inside_chunk(chunk, (x + 1, y - 1)) {
+                (chunk.is_empty(x + 1, y - 1), true)
+            } else {
+                (self.is_empty(x + 1, y - 1), false)
+            }
+        };
+        if down_left && down_right {
+            down_left = rand::thread_rng().gen_bool(0.5);
+            down_right = !down_left;
+        }
 
-    //     if down_left {
-    //         self.move_cell(x, y, x - 1, y - 1);
-    //     }
-    //     else if down_right {
-    //         self.move_cell(x, y, x + 1, y - 1);
-    //     }
+        if down_left && down_left_inside {
+            self.move_cell_same_chunk(x, y, x - 1, y - 1, chunk);
+        }
+        else if down_right && down_right_inside {
+            self.move_cell_same_chunk(x, y, x + 1, y - 1, chunk);
+        }
+        else if down_left {
+            self.move_cell_diff_chunk(x, y, x - 1, y - 1, chunk);
+        }
+        else if down_right {
+            self.move_cell_diff_chunk(x, y, x + 1, y - 1, chunk);
+        }
 
-    //     down_left || down_right
-    // }
+        down_left || down_right
+    }
 
-    // fn move_side(&self, x: i32, y: i32, chunk: &PixelChunk) -> bool {
-    //     let mut left = self.is_empty(x - 1, y);
-    //     let mut right = self.is_empty(x + 1, y);
-    //     if left && right {
-    //         left = rand::thread_rng().gen_bool(0.5);
-    //         right = !left;
-    //     }
+    fn move_side(&self, x: i32, y: i32, chunk: &mut PixelChunk) -> bool {
+        if self.inside_chunk(chunk, (x - 1, y)) && self.inside_chunk(chunk, (x + 1, y)) {
+            let mut left = chunk.is_empty(x - 1, y);
+            let mut right = chunk.is_empty(x + 1, y);
+            if left && right {
+                left = rand::thread_rng().gen_bool(0.5);
+                right = !left;
+            }
 
-    //     if left {
-    //         self.move_cell(x, y, x - 1, y);
-    //     }
-    //     else if right {
-    //         self.move_cell(x, y, x + 1, y);
-    //     }
+            if left {
+                self.move_cell_same_chunk(x, y, x - 1, y, chunk);
+            }
+            else if right {
+                self.move_cell_same_chunk(x, y, x + 1, y, chunk);
+            }
 
-    //     left || right
-    // }
+            return left || right;
+        }
+        else if self.chunk_exists_at_world_coord(x - 1, y) && self.chunk_exists_at_world_coord(x + 1, y) {
+            let mut left = self.is_empty(x - 1, y);
+            let mut right = self.is_empty(x + 1, y);
+            if left && right {
+                left = rand::thread_rng().gen_bool(0.5);
+                right = !left;
+            }
+
+            if left {
+                self.move_cell_diff_chunk(x, y, x - 1, y, chunk);
+            }
+            else if right {
+                self.move_cell_diff_chunk(x, y, x + 1, y, chunk);
+            }
+
+            return left || right;
+        }
+        false
+    }
 }
