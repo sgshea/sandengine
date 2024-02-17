@@ -9,6 +9,7 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d,
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use cell_types::CellType;
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
 const WORLD_SIZE: (i32, i32) = (512, 512);
@@ -31,10 +32,12 @@ fn main() {
             EguiPlugin
         ))
         .init_resource::<DebugInfo>()
+        .init_resource::<PixelSimulationInteraction>()
         .add_systems(Startup, setup_pixel_simulation)
         .add_systems(FixedUpdate, update_pixel_simulation)
         .add_systems(PostUpdate, render_pixel_simulation)
         .add_systems(Update, egui_ui)
+        .add_systems(Update, cell_selector_ui)
         .run();
 }
 
@@ -42,6 +45,19 @@ fn main() {
 pub struct PixelSimulation {
     pub world: world::PixelWorld,
     pub image_handle: Handle<Image>,
+}
+
+#[derive(Resource)]
+struct PixelSimulationInteraction {
+    pub selected_cell: CellType,
+}
+
+impl Default for PixelSimulationInteraction {
+    fn default() -> Self {
+        PixelSimulationInteraction {
+            selected_cell: CellType::Sand,
+        }
+    }
 }
 
 #[derive(Component)]
@@ -140,24 +156,24 @@ fn setup_pixel_simulation(
                     ..default()
                 },
                 PickableBundle::default(),
-                On::<Pointer<Click>>::run(|event: Listener<Pointer<Click>>, sim: Query<&mut PixelSimulation>| {
+                On::<Pointer<Click>>::run(|event: Listener<Pointer<Click>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>| {
                     if event.button == PointerButton::Primary {
                         let event_pos = event.pointer_location.position;
                         let cell_position = Vec2::new(
                             event_pos.x / SCALE.0,
                             WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
                         );
-                        place_cells_at_pos(sim, cell_position, cell_types::CellType::Sand);
+                        place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
-                On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>| {
+                On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>| {
                     if event.button == PointerButton::Primary {
                         let event_pos = event.pointer_location.position;
                         let cell_position = Vec2::new(
                             event_pos.x / SCALE.0,
                             WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
                         );
-                        place_cells_at_pos(sim, cell_position, cell_types::CellType::Sand);
+                        place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
                 On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>| {
@@ -226,6 +242,22 @@ fn egui_ui(
             ui.label(format!("Chunk Position: {:?}", dbg_info.chunk_position));
             ui.label(format!("Cell Position in Chunk: {:?}", dbg_info.cell_position_in_chunk));
             ui.label(format!("Hovered Cell: {:?}", dbg_info.hovered_cell));
+        }
+    );
+}
+
+fn cell_selector_ui(
+    mut ctx: EguiContexts,
+    mut pixel_interaction: ResMut<PixelSimulationInteraction>,
+) {
+    egui::Window::new("Cell Selector")
+    .show(ctx.ctx_mut(),
+        |ui| {
+            ui.set_min_width(100.0);
+            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Sand, "Sand");
+            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Water, "Water");
+            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Stone, "Stone");
+            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Empty, "Empty");
         }
     );
 }
