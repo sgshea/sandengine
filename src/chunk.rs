@@ -57,13 +57,11 @@ impl PixelChunk {
     pub fn get_cell_2d(&self, x: i32, y: i32) -> &Cell {
         let idx = self.get_index(x, y);
         if idx < self.cells.len() {
-            return &self.cells[idx]
+            &self.cells[idx]
         } else {
             println!("Index out of bounds: {} {} {}", x, y, idx);
-            println!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
+            panic!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
         }
-        &self.cells[idx]
-        &self.cells[idx]
     }
 
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
