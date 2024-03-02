@@ -2,6 +2,7 @@ mod cell;
 mod cell_types;
 mod world;
 mod chunk;
+mod cworker;
 
 use std::time;
 
@@ -65,12 +66,27 @@ struct MainCamera;
 
 #[derive(Resource, Default)]
 struct DebugInfo {
-    pub sim_time: f32,
-    pub render_construct_time: f32,
+    pub sim_time: Vec<f32>,
+    pub render_construct_time: Vec<f32>,
+    pub sim_time: Vec<f32>,
+    pub render_construct_time: Vec<f32>,
     pub position: Vec2,
     pub chunk_position: Vec2,
     pub cell_position_in_chunk: Vec2,
     pub hovered_cell: Option<cell::Cell>,
+}
+
+impl DebugInfo {
+    pub fn average_frame_time(&self) -> f32 {
+        let sim_time: f32 = self.sim_time.iter().sum();
+        let render_construct_time: f32 = self.render_construct_time.iter().sum();
+        (sim_time) / (self.sim_time.len() as f32)
+    }
+
+    pub fn average_render_construct_time(&self) -> f32 {
+        let render_construct_time: f32 = self.render_construct_time.iter().sum();
+        (render_construct_time) / (self.render_construct_time.len() as f32)
+    }
 }
 
 fn place_cells_at_pos(
@@ -198,7 +214,16 @@ fn update_pixel_simulation(
 ) {
     let start = time::Instant::now();
     query.iter_mut().next().unwrap().world.update();
-    dbg_info.sim_time = start.elapsed().as_secs_f32();
+    let elapsed = start.elapsed().as_secs_f32();
+    dbg_info.sim_time.push(elapsed);
+    if dbg_info.sim_time.len() > 100 {
+        dbg_info.sim_time.remove(0);
+    }
+    let elapsed = start.elapsed().as_secs_f32();
+    dbg_info.sim_time.push(elapsed);
+    if dbg_info.sim_time.len() > 100 {
+        dbg_info.sim_time.remove(0);
+    }
 }
 
 fn render_pixel_simulation(
@@ -221,7 +246,16 @@ fn render_pixel_simulation(
             }
         }
     }
-    dbg_info.render_construct_time = start.elapsed().as_secs_f32();
+    let elapsed = start.elapsed().as_secs_f32();
+    dbg_info.render_construct_time.push(elapsed);
+    if dbg_info.render_construct_time.len() > 100 {
+        dbg_info.render_construct_time.remove(0);
+    }
+    let elapsed = start.elapsed().as_secs_f32();
+    dbg_info.render_construct_time.push(elapsed);
+    if dbg_info.render_construct_time.len() > 100 {
+        dbg_info.render_construct_time.remove(0);
+    }
 }
 
 fn egui_ui(
@@ -233,11 +267,14 @@ fn egui_ui(
         |ui| {
             ui.set_min_width(200.0);
             // convert to ms
-            let sim_t_ms = dbg_info.sim_time * 1000.0;
-            let render_construct_t_ms = dbg_info.render_construct_time * 1000.0;
+            let sim_t_ms = dbg_info.average_frame_time() * 1000.0;
+            let render_construct_t_ms = dbg_info.average_render_construct_time() * 1000.0;
+            let sim_t_ms = dbg_info.average_frame_time() * 1000.0;
+            let render_construct_t_ms = dbg_info.average_render_construct_time() * 1000.0;
             ui.label(format!("Sim Time: {:.2}ms", sim_t_ms));
             ui.label(format!("Render Construct Time: {:.2}ms", render_construct_t_ms));
-            ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.sim_time));
+            ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.average_frame_time()));
+            ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.average_frame_time()));
             ui.label(format!("Position: {:?}", dbg_info.position));
             ui.label(format!("Chunk Position: {:?}", dbg_info.chunk_position));
             ui.label(format!("Cell Position in Chunk: {:?}", dbg_info.cell_position_in_chunk));
