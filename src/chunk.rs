@@ -33,6 +33,10 @@ impl PixelChunk {
         s
     }
 
+    pub fn get_pos(&self) -> (i32, i32) {
+        (self.pos_x, self.pos_y)
+    }
+
     pub fn get_index(&self, x: i32, y: i32) -> usize {
         // world to chunk coord
         let x = x % self.width;

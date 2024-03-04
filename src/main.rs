@@ -11,6 +11,8 @@ use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use cell_types::CellType;
+use rayon::prelude::*;
+
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
 const WORLD_SIZE: (i32, i32) = (512, 512);
@@ -234,17 +236,16 @@ fn render_pixel_simulation(
     let start = time::Instant::now();
     for sim in query.iter_mut() {
         let image = images.get_mut(&sim.image_handle).unwrap();
-        for y in 0..WORLD_SIZE.1 as usize {
-            for x in 0..WORLD_SIZE.0 as usize {
-                let cell = sim.world.get_cell(x as i32, y as i32);
-                let cell_color = cell.get_cell_color();
-                let index = (x + y * WORLD_SIZE.0 as usize) * 4;
-                image.data[index] = (cell_color[0] * 255.0) as u8;
-                image.data[index + 1] = (cell_color[1] * 255.0) as u8;
-                image.data[index + 2] = (cell_color[2]* 255.0) as u8;
-                image.data[index + 3] = 255;
-            }
-        }
+        image.data.par_chunks_mut(4).enumerate().for_each(|(i, pixel)| {
+            let x = i as i32 % WORLD_SIZE.0;
+            let y = i as i32 / WORLD_SIZE.0;
+            let cell = sim.world.get_cell(x, y);
+            let color = cell.get_cell_color();
+            pixel[0] = (color[0] * 255.0) as u8;
+            pixel[1] = (color[1] * 255.0) as u8;
+            pixel[2] = (color[2] * 255.0) as u8;
+            pixel[3] = 255;
+        });
     }
     let elapsed = start.elapsed().as_secs_f32();
     dbg_info.render_construct_time.push(elapsed);

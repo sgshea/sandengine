@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use bevy::utils::hashbrown::HashMap;
+use rayon::prelude::*;
+use bevy::utils::HashMap;
 
 use crate::{cell::Cell, chunk::PixelChunk, cworker::ChunkWorker};
 
@@ -126,14 +127,37 @@ impl PixelWorld {
     // Update cells
     pub fn update(&mut self) {
 
-        for chunk in self.chunks.iter() {
-            ChunkWorker::new(self, chunk.clone()).update_chunk();
-        }
+        // update in checkerboard based on position
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
+            if (pos.0 + pos.1) % 2 == 0 {
+                ChunkWorker::new(self, chunk.clone()).update_chunk();
+            }
+        });
+        // update rest
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
+            if (pos.0 + pos.1) % 2 != 0 {
+                ChunkWorker::new(self, chunk.clone()).update_chunk();
+            }
+        });
 
-        for chunk in self.chunks.iter() {
-            let mut chunk = chunk.lock().unwrap();
-            chunk.commit_cells();
-        }
+        // commit changes
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
+            if (pos.0 + pos.1) % 2 == 0 {
+                let mut chunk = chunk.lock().unwrap();
+                chunk.commit_cells();
+            }
+        });
+        // commit rest
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
+            if (pos.0 + pos.1) % 2 != 0 {
+                let mut chunk = chunk.lock().unwrap();
+                chunk.commit_cells();
+            }
+        });
     }
 
 }
