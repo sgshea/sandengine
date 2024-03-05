@@ -1,6 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
+use bevy::utils::HashMap;
 
 use crate::{cell::Cell, chunk::PixelChunk, cworker::ChunkWorker};
 
@@ -126,31 +127,35 @@ impl PixelWorld {
     // Update cells
     pub fn update(&mut self) {
 
-        // update in checkerboard based on position in lookup
-        self.chunks_lookup.par_iter().for_each(|(pos, chunk)| {
+        // update in checkerboard based on position
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
             if (pos.0 + pos.1) % 2 == 0 {
-                let worker = ChunkWorker::new(self, chunk.clone());
-                worker.update_chunk();
+                ChunkWorker::new(self, chunk.clone()).update_chunk();
             }
         });
         // update rest
-        self.chunks_lookup.par_iter().for_each(|(pos, chunk)| {
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
             if (pos.0 + pos.1) % 2 != 0 {
-                let worker = ChunkWorker::new(self, chunk.clone());
-                worker.update_chunk();
+                ChunkWorker::new(self, chunk.clone()).update_chunk();
             }
         });
 
-        // commit
-        self.chunks_lookup.par_iter().for_each(|(pos, chunk)| {
+        // commit changes
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
             if (pos.0 + pos.1) % 2 == 0 {
-                chunk.lock().unwrap().commit_cells();
+                let mut chunk = chunk.lock().unwrap();
+                chunk.commit_cells();
             }
         });
         // commit rest
-        self.chunks_lookup.par_iter().for_each(|(pos, chunk)| {
+        self.chunks.par_iter().for_each(|chunk| {
+            let pos = chunk.lock().unwrap().get_pos();
             if (pos.0 + pos.1) % 2 != 0 {
-                chunk.lock().unwrap().commit_cells();
+                let mut chunk = chunk.lock().unwrap();
+                chunk.commit_cells();
             }
         });
     }
