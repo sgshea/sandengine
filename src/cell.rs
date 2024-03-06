@@ -1,38 +1,36 @@
-use crate::cell_types::{CellType, DirectionType};
+use bevy::math::Vec2;
+
+use crate::cell_types::{CellType, DirectionType, StateType};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Cell {
-    cell_color: [f32; 3],
+    cell_color: [u8; 4],
     cell_movement: DirectionType, // Direction of cell movement (can have multiple)
-    cell_type: CellType, // Type of cell
+    cell_type: StateType, // Type of cell
+    velocity: Vec2,
 }
 
 impl Cell {
     pub fn new(ctype: CellType, dtype: DirectionType) -> Self {
-        // godot_print!("Cell mem size {}", std::mem::size_of::<Self>());
 
-        // Cell colors as u32
-        let cell_color = match ctype {
-            CellType::Empty => [0.0, 0.0, 0.0],
-            CellType::Sand => [0.85, 0.80, 0.5],
-            CellType::Stone => [0.49, 0.43, 0.43],
-            CellType::Water => [0.48, 0.6, 0.78],
-        };
+        let cell_color = ctype.cell_color();
 
         Self {
-            cell_type: ctype,
+            cell_type: ctype.into(),
             cell_color,
             cell_movement: dtype,
+            velocity: Vec2::new(0.0, 0.0),
         }
     }
 
     // Constant empty cell (because empty cell is common)
     pub fn empty() -> Self {
         Self {
-            cell_type: CellType::Empty,
-            cell_color: [0.0, 0.0, 0.0],
+            cell_type: CellType::Empty.into(),
+            cell_color: CellType::Empty.cell_color(),
             cell_movement: DirectionType::NONE,
+            velocity: Vec2::new(0.0, 0.0),
         }
     }
 
@@ -49,20 +47,29 @@ impl Cell {
         }
     }
 
-
     pub fn get_cell_movement(&self) -> DirectionType {
         self.cell_movement
     }
 
-    pub fn get_cell_type(&self) -> CellType {
-        self.cell_type.clone()
+    pub fn get_state_type(&self) -> StateType {
+        self.cell_type
     }
 
-    pub fn get_cell_color(&self) -> &[f32; 3] {
+    pub fn get_cell_type(&self) -> CellType {
+        match self.cell_type {
+            StateType::Empty(ctype) => ctype,
+            StateType::SoftSolid(ctype) => ctype,
+            StateType::HardSolid(ctype) => ctype,
+            StateType::Liquid(ctype) => ctype,
+            StateType::Gas(ctype) => ctype,
+        }
+    }
+
+    pub fn get_cell_color(&self) -> &[u8; 4] {
         &self.cell_color
     }
 
-    pub fn set_cell_type(&mut self, ctype: CellType) {
-        self.cell_type = ctype;
+    pub fn get_cell_density(&self) -> f32 {
+        self.get_cell_type().cell_density()
     }
 }
