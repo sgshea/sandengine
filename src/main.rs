@@ -10,6 +10,7 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d,
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use cell::Cell;
 use cell_types::CellType;
 use rayon::prelude::*;
 
@@ -99,7 +100,7 @@ fn place_cells_at_pos(
     for sim in sim.iter_mut() {
         for x in -5..5 {
             for y in -5..5 {
-                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, cell::Cell::cell_from_type(cell_type));
+                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, Cell::from(cell_type));
             }
         }
     }
@@ -111,10 +112,12 @@ fn cell_at_pos_dbg(
     mut dbg_info: ResMut<DebugInfo>,
 ) {
     for sim in sim.iter() {
+        // round pos down
+        let pos = Vec2::new(pos.x.floor(), pos.y.floor());
         dbg_info.position = pos;
         dbg_info.chunk_position = Vec2::new((pos.x / CHUNK_SIZE.0 as f32).floor(), (pos.y / CHUNK_SIZE.1 as f32).floor());
         dbg_info.cell_position_in_chunk = Vec2::new((pos.x % CHUNK_SIZE.0 as f32).floor(), (pos.y % CHUNK_SIZE.1 as f32).floor());
-        dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32));
+        dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32).expect("Cell out of bounds"));
     }
 }
 
@@ -239,12 +242,9 @@ fn render_pixel_simulation(
         image.data.par_chunks_mut(4).enumerate().for_each(|(i, pixel)| {
             let x = i as i32 % WORLD_SIZE.0;
             let y = i as i32 / WORLD_SIZE.0;
-            let cell = sim.world.get_cell(x, y);
-            let color = cell.get_cell_color();
-            pixel[0] = (color[0] * 255.0) as u8;
-            pixel[1] = (color[1] * 255.0) as u8;
-            pixel[2] = (color[2] * 255.0) as u8;
-            pixel[3] = 255;
+            let cell = sim.world.get_cell(x, y).expect("Cell out of bounds");
+            let color = cell.get_color();
+            pixel.copy_from_slice(color);
         });
     }
     let elapsed = start.elapsed().as_secs_f32();

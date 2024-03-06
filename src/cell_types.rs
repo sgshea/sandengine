@@ -1,22 +1,76 @@
 use bitflags::bitflags;
+use rand::Rng;
 
-#[repr(u32)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CellType {
-    Empty = 0,
-    Sand = 1,
-    Stone = 2,
-    Water = 3,
+    Empty,
+    Sand,
+    Stone,
+    Water,
 }
 
-// Not used yet, will probably be used once CellType starts expanding
+impl CellType {
+    pub fn cell_density(&self) -> f32 {
+        match self {
+            CellType::Empty => 0.0,
+            CellType::Sand => 1.5,
+            CellType::Stone => 2.0,
+            CellType::Water => 1.0,
+        }
+    }
+
+    pub fn cell_color(&self) -> [u8; 4] {
+        let mut trng = rand::thread_rng();
+        match self {
+            CellType::Empty => [0, 0, 0, 0],
+            CellType::Sand => {
+                [
+                    (230 + trng.gen_range(-20..20)) as u8,
+                    (195 + trng.gen_range(-20..20)) as u8,
+                    (92 + trng.gen_range(-20..20)) as u8,
+                    255,
+                ]
+            },
+            CellType::Stone => {
+                [
+                    (80 + trng.gen_range(-10..10)) as u8,
+                    (80 + trng.gen_range(-10..10)) as u8,
+                    (80 + trng.gen_range(-10..10)) as u8,
+                    255,
+                ]
+            },
+            CellType::Water => {
+                [
+                    (20 + trng.gen_range(-20..20)) as u8,
+                    (125 + trng.gen_range(-20..20)) as u8,
+                    (205 + trng.gen_range(-20..20)) as u8,
+                    150,
+                ]
+            },
+        }
+    }
+}
+
+// What kind of cell state is it?
+// Used to determine simple behaviors, but allows access to a more specific CellType
 #[derive(Clone, Copy, Debug)]
 pub enum StateType {
-    Empty,
-    SoftSolid, // Soft solid, like sand that can move
-    HardSolid, // Hard solid, like stone that can't move
-    Liquid,
-    Gas,
+    Empty(CellType),
+    SoftSolid(CellType), // Soft solid, like sand that can move
+    HardSolid(CellType), // Hard solid, like stone that can't move
+    Liquid(CellType),
+    Gas(CellType),
+}
+
+impl From<CellType> for StateType {
+    fn from(ctype: CellType) -> Self {
+        match ctype {
+            CellType::Empty => StateType::Empty(ctype),
+            CellType::Sand => StateType::SoftSolid(ctype),
+            CellType::Stone => StateType::HardSolid(ctype),
+            CellType::Water => StateType::Liquid(ctype),
+        }
+    }
 }
 
 // Direction stored as bitflags
