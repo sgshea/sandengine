@@ -233,10 +233,7 @@ fn render_pixel_simulation(
             let y = i as i32 / WORLD_SIZE.0;
             let cell = sim.world.get_cell(x, y);
             let color = cell.get_cell_color();
-            pixel[0] = (color[0] * 255.0) as u8;
-            pixel[1] = (color[1] * 255.0) as u8;
-            pixel[2] = (color[2] * 255.0) as u8;
-            pixel[3] = 255;
+            pixel.copy_from_slice(color);
         });
     }
     let elapsed = start.elapsed().as_secs_f32();
