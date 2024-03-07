@@ -13,7 +13,7 @@ impl CellType {
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
-            CellType::Sand => 1.0,
+            CellType::Sand => 1.5,
             CellType::Stone => 2.0,
             CellType::Water => 1.0,
         }

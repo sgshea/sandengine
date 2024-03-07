@@ -34,20 +34,7 @@ impl Cell {
         }
     }
 
-    // Construct a cell using the type (this is what should be used most of the time)
-    pub fn cell_from_type(ctype: CellType) -> Self {
-        match ctype {
-            CellType::Empty => Self::empty(),
-            CellType::Sand => Self::new(CellType::Sand,
-                 DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT),
-            CellType::Stone => Self::new(CellType::Stone,
-                 DirectionType::NONE),
-            CellType::Water => Self::new(CellType::Water,
-                 DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT),
-        }
-    }
-
-    pub fn get_cell_movement(&self) -> DirectionType {
+    pub fn get_movement(&self) -> DirectionType {
         self.cell_movement
     }
 
@@ -55,7 +42,7 @@ impl Cell {
         self.cell_type
     }
 
-    pub fn get_cell_type(&self) -> CellType {
+    pub fn get_type(&self) -> CellType {
         match self.cell_type {
             StateType::Empty(ctype) => ctype,
             StateType::SoftSolid(ctype) => ctype,
@@ -65,11 +52,25 @@ impl Cell {
         }
     }
 
-    pub fn get_cell_color(&self) -> &[u8; 4] {
+    pub fn get_color(&self) -> &[u8; 4] {
         &self.cell_color
     }
 
-    pub fn get_cell_density(&self) -> f32 {
-        self.get_cell_type().cell_density()
+    pub fn get_density(&self) -> f32 {
+        self.get_type().cell_density()
+    }
+}
+
+impl From<CellType> for Cell {
+    fn from(ctype: CellType) -> Self {
+        match ctype {
+            CellType::Empty => Self::empty(),
+            CellType::Sand => Self::new(CellType::Sand,
+                 DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT),
+            CellType::Stone => Self::new(CellType::Stone,
+                 DirectionType::NONE),
+            CellType::Water => Self::new(CellType::Water,
+                 DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT),
+        }
     }
 }

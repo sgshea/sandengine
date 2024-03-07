@@ -10,6 +10,7 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d,
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use cell::Cell;
 use cell_types::CellType;
 use rayon::prelude::*;
 
@@ -96,7 +97,7 @@ fn place_cells_at_pos(
     for sim in sim.iter_mut() {
         for x in -5..5 {
             for y in -5..5 {
-                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, cell::Cell::cell_from_type(cell_type));
+                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, Cell::from(cell_type));
             }
         }
     }
@@ -232,7 +233,7 @@ fn render_pixel_simulation(
             let x = i as i32 % WORLD_SIZE.0;
             let y = i as i32 / WORLD_SIZE.0;
             let cell = sim.world.get_cell(x, y);
-            let color = cell.get_cell_color();
+            let color = cell.get_color();
             pixel.copy_from_slice(color);
         });
     }
