@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::{mem, sync::{Arc, Mutex}};
 
 use rand::Rng;
 
@@ -51,7 +51,7 @@ impl PixelChunk {
 
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
         let idx = self.get_index(x, y);
-        idx < self.cells.len() && self.cells[idx].get_cell_type() == CellType::Empty
+        idx < self.cells.len() && self.cells[idx].get_type() == CellType::Empty
     }
 
     pub fn get_cell(&self, idx: usize) -> &Cell {
@@ -85,9 +85,28 @@ impl PixelChunk {
         }
     }
 
+    fn swap_cells_diff_chunk(&mut self, src: usize, dst: usize, chunk: Arc<Mutex<PixelChunk>>) {
+        let mut chunk = chunk.lock().unwrap();
+        mem::swap(&mut self.cells[dst], &mut chunk.cells[src]);
+    }
+
+    fn swap_cells(&mut self, src: usize, dst: usize) {
+        self.cells.swap(src, dst);
+    }
+
     pub fn commit_cells(&mut self) {
-        // Remove moves that have their destinations filled
-        self.changes.retain(|(_, _, dst)| self.cells[*dst as usize].get_cell_type() == CellType::Empty);
+        // Remove moves that have their desitnations filled OR the destination cell has less density than the source cell
+        self.changes.retain(|(chunk, src, dst)| {
+            if self.cells[*dst as usize].get_type() == CellType::Empty {
+                return true;
+            }
+            if let Some(chunk) = chunk {
+                let chunk = chunk.lock().unwrap();
+                self.cells[*dst as usize].get_density() < chunk.cells[*src as usize].get_density()
+            } else {
+                self.cells[*dst as usize].get_density() < self.cells[*src as usize].get_density()
+            }
+        });
 
         // Sort by destination
         self.changes.sort_by(|a, b| a.2.cmp(&b.2));
@@ -105,13 +124,10 @@ impl PixelChunk {
                 let src = self.changes[rand].1;
                 match &self.changes[rand].0 {
                     Some(chunk) => {
-                        let mut chunk = chunk.lock().unwrap();
-                        self.cells[dst as usize] = chunk.cells[src as usize].clone();
-                        chunk.cells[src as usize] = Cell::empty();
+                        self.swap_cells_diff_chunk(src, dst, chunk.clone());
                     },
                     None => {
-                        self.cells[dst as usize] = self.cells[src as usize].clone();
-                        self.cells[src as usize] = Cell::empty();
+                        self.swap_cells(src, dst);
                     }
                 }
                 iprev = i + 1;
