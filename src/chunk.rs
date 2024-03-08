@@ -49,6 +49,19 @@ impl PixelChunk {
         x >= 0 && x < self.width && y >= 0 && y < self.height
     }
 
+    fn in_bounds_world(&self, x: i32, y: i32) -> bool {
+        let idx = self.get_index(x, y);
+        idx < self.cells.len()
+    }
+
+    pub fn can_move_to(&self, density_from: f32, xto: i32, yto: i32) -> bool {
+        if self.in_bounds_world(xto, yto) {
+            let cell = self.cells[self.get_index(xto, yto)];
+            return cell.get_type() == CellType::Empty || cell.get_density() < density_from
+        }
+        false
+    }
+
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
         let idx = self.get_index(x, y);
         idx < self.cells.len() && self.cells[idx].get_type() == CellType::Empty
@@ -95,19 +108,6 @@ impl PixelChunk {
     }
 
     pub fn commit_cells(&mut self) {
-        // Remove moves that have their desitnations filled OR the destination cell has less density than the source cell
-        self.changes.retain(|(chunk, src, dst)| {
-            if self.cells[*dst as usize].get_type() == CellType::Empty {
-                return true;
-            }
-            if let Some(chunk) = chunk {
-                let chunk = chunk.lock().unwrap();
-                self.cells[*dst as usize].get_density() < chunk.cells[*src as usize].get_density()
-            } else {
-                self.cells[*dst as usize].get_density() < self.cells[*src as usize].get_density()
-            }
-        });
-
         // Sort by destination
         self.changes.sort_by(|a, b| a.2.cmp(&b.2));
 

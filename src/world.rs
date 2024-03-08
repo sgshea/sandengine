@@ -69,13 +69,20 @@ impl PixelWorld {
         }
     }
 
-    pub fn get_cell(&self, x: i32, y: i32) -> Cell {
+    pub fn in_bounds(&self, x: i32, y: i32) -> bool {
+        x >= 0 && x < self.c_width * self.chunks_x && y >= 0 && y < self.c_height * self.chunks_y
+    }
+
+    pub fn get_cell(&self, x: i32, y: i32) -> Option<Cell> {
+        if x < 0 || x >= self.c_width * self.chunks_x || y < 0 || y >= self.c_height * self.chunks_y {
+            return None;
+        }
         match self.get_chunk(x, y) {
             Some(chunk) => {
                 let chunk = chunk.lock().unwrap();
-                chunk.get_cell_2d(x, y).clone()
+                Some(chunk.get_cell_2d(x, y).clone())
             },
-            None => Cell::empty()
+            None => None
         }
     }
 
