@@ -6,7 +6,7 @@ mod cworker;
 
 use std::time;
 
-use bevy::{prelude::*, render::{camera::ScalingMode, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::PresentMode};
+use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::PresentMode};
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
@@ -148,6 +148,7 @@ fn setup_pixel_simulation(
         TextureDimension::D2,
         vec![0; (WORLD_SIZE.0 * WORLD_SIZE.1 * 4) as usize],
         TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     );
     image.sampler = ImageSampler::nearest();
     let image_handle = images.add(image);
