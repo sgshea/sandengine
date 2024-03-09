@@ -4,14 +4,15 @@ mod world;
 mod chunk;
 mod cworker;
 
+mod debug_ui;
+
 use std::time;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::PresentMode};
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use cell::Cell;
-use cell_types::CellType;
+use bevy_egui::EguiPlugin;
+use debug_ui::{cell_at_pos_dbg, cell_selector_ui, draw_chunk_gizmos, egui_ui, place_cells_at_pos, ChunkGizmos, DebugInfo, PixelSimulationInteraction};
 use rayon::prelude::*;
 
 
@@ -36,12 +37,14 @@ fn main() {
             EguiPlugin
         ))
         .init_resource::<DebugInfo>()
+        .init_gizmo_group::<ChunkGizmos>()
         .init_resource::<PixelSimulationInteraction>()
         .add_systems(Startup, setup_pixel_simulation)
         .add_systems(FixedUpdate, update_pixel_simulation)
         .add_systems(PostUpdate, render_pixel_simulation)
         .add_systems(Update, egui_ui)
         .add_systems(Update, cell_selector_ui)
+        // .add_systems(Update, draw_chunk_gizmos)
         .run();
 }
 
@@ -51,72 +54,8 @@ pub struct PixelSimulation {
     pub image_handle: Handle<Image>,
 }
 
-#[derive(Resource)]
-struct PixelSimulationInteraction {
-    pub selected_cell: CellType,
-}
-
-impl Default for PixelSimulationInteraction {
-    fn default() -> Self {
-        PixelSimulationInteraction {
-            selected_cell: CellType::Sand,
-        }
-    }
-}
-
 #[derive(Component)]
 struct MainCamera;
-
-#[derive(Resource, Default)]
-struct DebugInfo {
-    pub sim_time: Vec<f32>,
-    pub render_construct_time: Vec<f32>,
-    pub position: Vec2,
-    pub chunk_position: Vec2,
-    pub cell_position_in_chunk: Vec2,
-    pub hovered_cell: Option<cell::Cell>,
-}
-
-impl DebugInfo {
-    pub fn average_frame_time(&self) -> f32 {
-        let sim_time: f32 = self.sim_time.iter().sum();
-        (sim_time) / (self.sim_time.len() as f32)
-    }
-
-    pub fn average_render_construct_time(&self) -> f32 {
-        let render_construct_time: f32 = self.render_construct_time.iter().sum();
-        (render_construct_time) / (self.render_construct_time.len() as f32)
-    }
-}
-
-fn place_cells_at_pos(
-    mut sim: Query<&mut PixelSimulation>,
-    pos: Vec2,
-    cell_type: cell_types::CellType,
-) {
-    for sim in sim.iter_mut() {
-        for x in -5..5 {
-            for y in -5..5 {
-                sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, Cell::from(cell_type));
-            }
-        }
-    }
-}
-
-fn cell_at_pos_dbg(
-    sim: Query<&mut PixelSimulation>,
-    pos: Vec2,
-    mut dbg_info: ResMut<DebugInfo>,
-) {
-    for sim in sim.iter() {
-        // round pos down
-        let pos = Vec2::new(pos.x.floor(), pos.y.floor());
-        dbg_info.position = pos;
-        dbg_info.chunk_position = Vec2::new((pos.x / CHUNK_SIZE.0 as f32).floor(), (pos.y / CHUNK_SIZE.1 as f32).floor());
-        dbg_info.cell_position_in_chunk = Vec2::new((pos.x % CHUNK_SIZE.0 as f32).floor(), (pos.y % CHUNK_SIZE.1 as f32).floor());
-        dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32).expect("Cell out of bounds"));
-    }
-}
 
 fn setup_pixel_simulation(
     mut commands: Commands,
@@ -245,42 +184,4 @@ fn render_pixel_simulation(
     if dbg_info.render_construct_time.len() > 100 {
         dbg_info.render_construct_time.remove(0);
     }
-}
-
-fn egui_ui(
-    mut ctx: EguiContexts,
-    dbg_info: ResMut<DebugInfo>,
-) {
-    egui::Window::new("Debug Info")
-    .show(ctx.ctx_mut(),
-        |ui| {
-            ui.set_min_width(200.0);
-            // convert to ms
-            let sim_t_ms = dbg_info.average_frame_time() * 1000.0;
-            let render_construct_t_ms = dbg_info.average_render_construct_time() * 1000.0;
-            ui.label(format!("Sim Time: {:.2}ms", sim_t_ms));
-            ui.label(format!("Render Construct Time: {:.2}ms", render_construct_t_ms));
-            ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.average_frame_time()));
-            ui.label(format!("Position: {:?}", dbg_info.position));
-            ui.label(format!("Chunk Position: {:?}", dbg_info.chunk_position));
-            ui.label(format!("Cell Position in Chunk: {:?}", dbg_info.cell_position_in_chunk));
-            ui.label(format!("Hovered Cell: {:?}", dbg_info.hovered_cell));
-        }
-    );
-}
-
-fn cell_selector_ui(
-    mut ctx: EguiContexts,
-    mut pixel_interaction: ResMut<PixelSimulationInteraction>,
-) {
-    egui::Window::new("Cell Selector")
-    .show(ctx.ctx_mut(),
-        |ui| {
-            ui.set_min_width(100.0);
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Sand, "Sand");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Water, "Water");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Stone, "Stone");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Empty, "Empty");
-        }
-    );
 }
