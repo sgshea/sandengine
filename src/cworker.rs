@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use rand::Rng;
 
-use crate::{cell_types::{CellType, DirectionType}, chunk::PixelChunk, world::PixelWorld};
+use crate::{cell_types::{should_move_density, CellType, DirectionType}, chunk::PixelChunk, world::PixelWorld};
 
 pub struct ChunkWorker<'a> {
     world: &'a PixelWorld,
@@ -179,7 +179,7 @@ impl ChunkWorker<'_> {
 
     fn can_move_to_world(&self, density_from: f32, xto: i32, yto: i32) -> bool {
         match self.world.get_cell(xto, yto) {
-            Some(cell) => cell.get_type() == CellType::Empty || cell.get_density() < density_from,
+            Some(cell) => cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density()),
             None => false
         }
     }

@@ -2,7 +2,7 @@ use std::{mem, sync::{Arc, Mutex}};
 
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::CellType};
+use crate::{cell::Cell, cell_types::{should_move_density, CellType}};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
@@ -57,7 +57,7 @@ impl PixelChunk {
     pub fn can_move_to(&self, density_from: f32, xto: i32, yto: i32) -> bool {
         if self.in_bounds_world(xto, yto) {
             let cell = self.cells[self.get_index(xto, yto)];
-            return cell.get_type() == CellType::Empty || cell.get_density() < density_from
+            return cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density());
         }
         false
     }
