@@ -3,29 +3,34 @@ use bevy_mod_picking::backends::egui::bevy_egui;
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts};
 
-use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE};
+use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {
     pub selected_cell: CellType,
+    // How much cells to place when clicking
+    pub cell_amount: i32,
 }
 
 impl Default for PixelSimulationInteraction {
     fn default() -> Self {
         PixelSimulationInteraction {
             selected_cell: CellType::Sand,
+            cell_amount: 10,
         }
     }
 }
 
 pub fn place_cells_at_pos(
     mut sim: Query<&mut PixelSimulation>,
+    amt_to_place: i32,
     pos: Vec2,
     cell_type: CellType,
 ) {
+    let amt_to_place_quarter = amt_to_place / 4;
     for sim in sim.iter_mut() {
-        for x in -5..5 {
-            for y in -5..5 {
+        for x in -amt_to_place_quarter..amt_to_place_quarter {
+            for y in -amt_to_place_quarter..amt_to_place_quarter {
                 sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, Cell::from(cell_type));
             }
         }
@@ -103,6 +108,8 @@ pub fn cell_selector_ui(
             ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Water, "Water");
             ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Stone, "Stone");
             ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Empty, "Empty");
+
+            ui.add(egui::Slider::new(&mut pixel_interaction.cell_amount, 4..=100).text("Amount to spawn"));
         }
     );
 }
@@ -116,12 +123,25 @@ pub fn draw_chunk_gizmos(
     // Create a rectangle for each chunk
     for x in 0..CHUNKS.0 {
         for y in 0..CHUNKS.1 {
+            let pos_x = ((x as f32 * CHUNK_SIZE.0 as f32) - WORLD_SIZE.0 as f32 / 2.0) + CHUNK_SIZE.0 as f32 / 2.0;
+            let pos_y = ((y as f32 * CHUNK_SIZE.1 as f32) - WORLD_SIZE.1 as f32 / 2.0) + CHUNK_SIZE.1 as f32 / 2.0;
+
             chunk_gizmos.rect_2d(
-                Vec2::new(x as f32 * CHUNK_SIZE.0 as f32, y as f32 * CHUNK_SIZE.1 as f32),
+                Vec2::new(pos_x, pos_y),
                 0.0,
                 Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
-                Color::rgba(0.0, 0.0, 0.0, 0.5),
+                Color::rgba(1.0, 0.0, 0.0, 0.5),
             );
         }
+    }
+}
+
+pub fn update_gizmos_config(
+    mut config_store: ResMut<GizmoConfigStore>,
+    keyboard: Res<ButtonInput<KeyCode>>,
+) {
+    let (chunk_config, _) = config_store.config_mut::<ChunkGizmos>();
+    if keyboard.just_pressed(KeyCode::Digit0) {
+        chunk_config.enabled ^= true;
     }
 }
