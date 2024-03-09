@@ -12,7 +12,7 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUs
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::EguiPlugin;
-use debug_ui::{cell_at_pos_dbg, cell_selector_ui, draw_chunk_gizmos, egui_ui, place_cells_at_pos, ChunkGizmos, DebugInfo, PixelSimulationInteraction};
+use debug_ui::{cell_at_pos_dbg, cell_selector_ui, draw_chunk_gizmos, egui_ui, place_cells_at_pos, update_gizmos_config, ChunkGizmos, DebugInfo, PixelSimulationInteraction};
 use rayon::prelude::*;
 
 
@@ -45,7 +45,7 @@ fn main() {
         .add_systems(Update, egui_ui)
         .add_systems(Update, cell_selector_ui)
         .add_systems(Update, resize_window)
-        // .add_systems(Update, draw_chunk_gizmos)
+        .add_systems(Update, (draw_chunk_gizmos, update_gizmos_config))
         .run();
 }
 
@@ -126,7 +126,7 @@ fn setup_pixel_simulation(
                             event_pos.x / window_info.scale.0,
                             WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
                         );
-                        place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
+                        place_cells_at_pos(sim, pixel_interaction.cell_amount, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
                 On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>, window_info: ResMut<WindowInformation>| {
@@ -136,7 +136,7 @@ fn setup_pixel_simulation(
                             event_pos.x / window_info.scale.0,
                             WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
                         );
-                        place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
+                        place_cells_at_pos(sim, pixel_interaction.cell_amount, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
                 On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>, window_info: ResMut<WindowInformation> | {

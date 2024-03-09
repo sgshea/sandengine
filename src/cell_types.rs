@@ -1,6 +1,9 @@
 use bitflags::bitflags;
 use rand::Rng;
 
+// Maximum density of a cell
+const MAX_DENSITY: f32 = 100.0;
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum CellType {
     Empty,
@@ -13,9 +16,9 @@ impl CellType {
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
-            CellType::Sand => 1.5,
-            CellType::Stone => 2.0,
-            CellType::Water => 1.0,
+            CellType::Sand => 60.0,
+            CellType::Stone => 100.0,
+            CellType::Water => 30.0,
         }
     }
 
@@ -49,6 +52,25 @@ impl CellType {
             },
         }
     }
+}
+
+// Computes a chance to move based on differing densities of cells
+// If the density of the cell we're moving from is greater than the density of the cell we're moving to,
+// then we have a chance to move based on the difference in densities
+//
+// Basically: the greater the difference in densities, the faster a cell will move through another cell
+pub fn should_move_density(density_from: f32, density_to: f32) -> bool {
+    if density_from < density_to {
+        return false;
+    }
+
+    let density_diff = density_from - density_to;
+    let move_probability = density_diff.abs() / MAX_DENSITY;
+
+    let mut trng = rand::thread_rng();
+    let random_number: f32 = trng.gen_range(0.0..1.0);
+
+    random_number < move_probability
 }
 
 // What kind of cell state is it?
