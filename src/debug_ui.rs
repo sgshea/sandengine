@@ -3,7 +3,7 @@ use bevy_mod_picking::backends::egui::bevy_egui;
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts};
 
-use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE, RESOLUTION, SCALE, WORLD_SIZE};
+use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {

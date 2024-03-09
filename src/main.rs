@@ -8,7 +8,7 @@ mod debug_ui;
 
 use std::time;
 
-use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::PresentMode};
+use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}, window::{PresentMode, WindowResized}};
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::EguiPlugin;
@@ -18,7 +18,6 @@ use rayon::prelude::*;
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
 const WORLD_SIZE: (i32, i32) = (512, 512);
-const SCALE: (f32, f32) = (RESOLUTION.0 / WORLD_SIZE.0 as f32, RESOLUTION.1 / WORLD_SIZE.1 as f32);
 const CHUNKS: (i32, i32) = (8, 8);
 const CHUNK_SIZE: (i32, i32) = (WORLD_SIZE.0 / CHUNKS.0, WORLD_SIZE.1 / CHUNKS.1);
 
@@ -37,6 +36,7 @@ fn main() {
             EguiPlugin
         ))
         .init_resource::<DebugInfo>()
+        .init_resource::<WindowInformation>()
         .init_gizmo_group::<ChunkGizmos>()
         .init_resource::<PixelSimulationInteraction>()
         .add_systems(Startup, setup_pixel_simulation)
@@ -44,6 +44,7 @@ fn main() {
         .add_systems(PostUpdate, render_pixel_simulation)
         .add_systems(Update, egui_ui)
         .add_systems(Update, cell_selector_ui)
+        .add_systems(Update, resize_window)
         // .add_systems(Update, draw_chunk_gizmos)
         .run();
 }
@@ -54,24 +55,32 @@ pub struct PixelSimulation {
     pub image_handle: Handle<Image>,
 }
 
+#[derive(Resource, Default)]
+struct WindowInformation {
+    scale: (f32, f32),
+}
+
 #[derive(Component)]
 struct MainCamera;
 
 fn setup_pixel_simulation(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
+    mut window_info: ResMut<WindowInformation>,
     ) {
     commands.spawn((Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::Fixed {
-                width: RESOLUTION.0,
-                height: RESOLUTION.1,
+                width: WORLD_SIZE.0 as f32,
+                height: WORLD_SIZE.1 as f32,
             },
             near: -1000.0,
             ..default()
         },
         ..default()
     }, MainCamera));
+
+    window_info.scale = (RESOLUTION.0 / WORLD_SIZE.0 as f32, RESOLUTION.1 / WORLD_SIZE.1 as f32);
 
     let world = world::PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1, CHUNKS.0, CHUNKS.1);
 
@@ -103,10 +112,6 @@ fn setup_pixel_simulation(
                 Name::new("Image"),
                 SpriteBundle {
                     texture: image_handle,
-                    transform: Transform {
-                        scale: Vec3::new(SCALE.0, SCALE.1, 1.0),
-                        ..default()
-                    },
                     sprite: Sprite {
                         flip_y: true,
                         ..default()
@@ -114,31 +119,31 @@ fn setup_pixel_simulation(
                     ..default()
                 },
                 PickableBundle::default(),
-                On::<Pointer<Click>>::run(|event: Listener<Pointer<Click>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>| {
+                On::<Pointer<Click>>::run(|event: Listener<Pointer<Click>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>, window_info: ResMut<WindowInformation>| {
                     if event.button == PointerButton::Primary {
                         let event_pos = event.pointer_location.position;
                         let cell_position = Vec2::new(
-                            event_pos.x / SCALE.0,
-                            WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
+                            event_pos.x / window_info.scale.0,
+                            WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
                         );
                         place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
-                On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>| {
+                On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>, window_info: ResMut<WindowInformation>| {
                     if event.button == PointerButton::Primary {
                         let event_pos = event.pointer_location.position;
                         let cell_position = Vec2::new(
-                            event_pos.x / SCALE.0,
-                            WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
+                            event_pos.x / window_info.scale.0,
+                            WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
                         );
                         place_cells_at_pos(sim, cell_position, pixel_interaction.selected_cell);
                     }
                 }),
-                On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>| {
+                On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>, window_info: ResMut<WindowInformation> | {
                     let event_pos = event.pointer_location.position;
                     let cell_position = Vec2::new(
-                        event_pos.x / SCALE.0,
-                        WORLD_SIZE.1 as f32 - (event_pos.y / SCALE.1),
+                        event_pos.x / window_info.scale.0,
+                        WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
                     );
                     if cell_position.x < 0. || cell_position.y < 0. || cell_position.x > WORLD_SIZE.0 as f32 || cell_position.y > WORLD_SIZE.1 as f32 {
                         // these are invalid
@@ -183,5 +188,17 @@ fn render_pixel_simulation(
     dbg_info.render_construct_time.push(elapsed);
     if dbg_info.render_construct_time.len() > 100 {
         dbg_info.render_construct_time.remove(0);
+    }
+}
+
+fn resize_window(
+    mut events: EventReader<WindowResized>,
+    mut window_info: ResMut<WindowInformation>,
+) {
+    match events.read().last() {
+        Some(event) => {
+            window_info.scale = (event.width / WORLD_SIZE.0 as f32, event.height / WORLD_SIZE.1 as f32);
+        },
+        None => {}
     }
 }
