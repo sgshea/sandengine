@@ -37,16 +37,19 @@ impl ChunkWorker<'_> {
                 }
             }
         }
+
+        chunk.awake = chunk.awake_next;
+        chunk.awake_next = if chunk.changes.len() > 0 { true } else { false };
     }
 
     fn move_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         if self.world.inside_chunk(chunk, (x, y - 1)) {
-            if chunk.can_move_to(density, x, y - 1) {
-                self.world.move_cell_same_chunk(x, y, x, y - 1, chunk);
+            if can_move_to(chunk, density, x, y - 1) {
+                self.move_cell_same_chunk(x, y, x, y - 1, chunk);
                 return true;
             }
         } else if self.world.chunk_exists_at_world_coord(x, y - 1) {
-            if self.can_move_to_world(density, x, y - 1) {
+            if can_move_to_world(self.world, density, x, y - 1) {
                 self.world.move_cell_diff_chunk(x, y, x, y - 1, chunk);
                 return true;
             }
@@ -56,8 +59,8 @@ impl ChunkWorker<'_> {
 
     fn move_up(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         if self.world.inside_chunk(chunk, (x, y + 1)) {
-            if chunk.can_move_to(density, x, y + 1) {
-                self.world.move_cell_same_chunk(x, y, x, y + 1, chunk);
+            if can_move_to(chunk, density, x, y + 1) {
+                self.move_cell_same_chunk(x, y, x, y + 1, chunk);
                 return true;
             }
         } else if self.world.chunk_exists_at_world_coord(x, y + 1) {
@@ -72,16 +75,16 @@ impl ChunkWorker<'_> {
     fn move_diagonal_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         let (mut down_left, down_left_inside) = {
             if self.world.inside_chunk(chunk, (x - 1, y - 1)) {
-                (chunk.can_move_to(density, x - 1, y - 1), true)
+                (can_move_to(chunk, density, x - 1, y - 1), true)
             } else {
-                (self.can_move_to_world(density, x - 1, y - 1), false)
+                (can_move_to_world(self.world, density, x - 1, y - 1), false)
             }
         };
         let (mut down_right, down_right_inside) = {
             if self.world.inside_chunk(chunk, (x + 1, y - 1)) {
-                (chunk.can_move_to(density, x + 1, y - 1), true)
+                (can_move_to(chunk, density, x + 1, y - 1), true)
             } else {
-                (self.can_move_to_world(density, x + 1, y - 1), false)
+                (can_move_to_world(self.world, density, x + 1, y - 1), false)
             }
         };
         if down_left && down_right {
@@ -90,10 +93,10 @@ impl ChunkWorker<'_> {
         }
 
         if down_left && down_left_inside {
-            self.world.move_cell_same_chunk(x, y, x - 1, y - 1, chunk);
+            self.move_cell_same_chunk(x, y, x - 1, y - 1, chunk);
         }
         else if down_right && down_right_inside {
-            self.world.move_cell_same_chunk(x, y, x + 1, y - 1, chunk);
+            self.move_cell_same_chunk(x, y, x + 1, y - 1, chunk);
         }
         else if down_left {
             self.world.move_cell_diff_chunk(x, y, x - 1, y - 1, chunk);
@@ -108,16 +111,16 @@ impl ChunkWorker<'_> {
     fn move_diagonal_up(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         let (mut up_left, up_left_inside) = {
             if self.world.inside_chunk(chunk, (x - 1, y + 1)) {
-                (chunk.can_move_to(density, x - 1, y + 1), true)
+                (can_move_to(chunk, density, x - 1, y + 1), true)
             } else {
-                (self.can_move_to_world(density, x - 1, y + 1), false)
+                (can_move_to_world(self.world, density, x - 1, y + 1), false)
             }
         };
         let (mut up_right, up_right_inside) = {
             if self.world.inside_chunk(chunk, (x + 1, y + 1)) {
-                (chunk.can_move_to(density, x + 1, y + 1), true)
+                (can_move_to(chunk, density, x + 1, y + 1), true)
             } else {
-                (self.can_move_to_world(density, x + 1, y + 1), false)
+                (can_move_to_world(self.world, density, x + 1, y + 1), false)
             }
         };
         if up_left && up_right {
@@ -126,10 +129,10 @@ impl ChunkWorker<'_> {
         }
 
         if up_left && up_left_inside {
-            self.world.move_cell_same_chunk(x, y, x - 1, y + 1, chunk);
+            self.move_cell_same_chunk(x, y, x - 1, y + 1, chunk);
         }
         else if up_right && up_right_inside {
-            self.world.move_cell_same_chunk(x, y, x + 1, y + 1, chunk);
+            self.move_cell_same_chunk(x, y, x + 1, y + 1, chunk);
         }
         else if up_left {
             self.world.move_cell_diff_chunk(x, y, x - 1, y + 1, chunk);
@@ -144,16 +147,16 @@ impl ChunkWorker<'_> {
     fn move_side(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         let (mut left, left_inside) = {
             if self.world.inside_chunk(chunk, (x - 1, y)) {
-                (chunk.can_move_to(density, x - 1, y), true)
+                (can_move_to(chunk, density, x - 1, y), true)
             } else {
-                (self.can_move_to_world(density, x - 1, y), false)
+                (can_move_to_world(self.world, density, x - 1, y), false)
             }
         };
         let (mut right, right_inside) = {
             if self.world.inside_chunk(chunk, (x + 1, y)) {
-                (chunk.can_move_to(density, x + 1, y), true)
+                (can_move_to(chunk, density, x + 1, y), true)
             } else {
-                (self.can_move_to_world(density, x + 1, y), false)
+                (can_move_to_world(self.world, density, x + 1, y), false)
             }
         };
         if left && right {
@@ -162,10 +165,10 @@ impl ChunkWorker<'_> {
         }
 
         if left && left_inside {
-            self.world.move_cell_same_chunk(x, y, x - 1, y, chunk);
+            self.move_cell_same_chunk(x, y, x - 1, y, chunk);
         }
         else if right && right_inside {
-            self.world.move_cell_same_chunk(x, y, x + 1, y, chunk);
+            self.move_cell_same_chunk(x, y, x + 1, y, chunk);
         }
         else if left {
             self.world.move_cell_diff_chunk(x, y, x - 1, y, chunk);
@@ -177,10 +180,25 @@ impl ChunkWorker<'_> {
         left || right
     }
 
-    fn can_move_to_world(&self, density_from: f32, xto: i32, yto: i32) -> bool {
-        match self.world.get_cell(xto, yto) {
-            Some(cell) => cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density()),
-            None => false
-        }
+    pub fn move_cell_same_chunk(&self, x: i32, y: i32, xto: i32, yto: i32, chunk: &mut PixelChunk) {
+        let from_idx = chunk.get_index(x, y);
+        chunk.changes.push((None, from_idx, chunk.get_index(xto, yto)));
+    }
+}
+
+#[inline]
+fn can_move_to(chunk: &PixelChunk, density_from: f32, xto: i32, yto: i32) -> bool {
+    if chunk.in_bounds_world(xto, yto) {
+        let cell = chunk.cells[chunk.get_index(xto, yto)];
+        return cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density());
+    }
+    false
+}
+
+#[inline]
+fn can_move_to_world(world: &PixelWorld, density_from: f32, xto: i32, yto: i32) -> bool {
+    match world.get_cell(xto, yto) {
+        Some(cell) => cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density()),
+        None => false
     }
 }

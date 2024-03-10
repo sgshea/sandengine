@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy_mod_picking::backends::egui::bevy_egui;
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::{egui, EguiContexts};
+use strum::{IntoEnumIterator, VariantNames};
 
 use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE, WORLD_SIZE};
 
@@ -104,10 +105,9 @@ pub fn cell_selector_ui(
     .show(ctx.ctx_mut(),
         |ui| {
             ui.set_min_width(100.0);
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Sand, "Sand");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Water, "Water");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Stone, "Stone");
-            ui.radio_value(&mut pixel_interaction.selected_cell, CellType::Empty, "Empty");
+            for (cell_type, name) in CellType::iter().zip(CellType::VARIANTS.iter()) {
+                ui.radio_value(&mut pixel_interaction.selected_cell, cell_type, *name);
+            }
 
             ui.add(egui::Slider::new(&mut pixel_interaction.cell_amount, 4..=100).text("Amount to spawn"));
         }
@@ -119,18 +119,29 @@ pub struct ChunkGizmos {}
 
 pub fn draw_chunk_gizmos(
     mut chunk_gizmos: Gizmos<ChunkGizmos>,
+    pixel_query: Query<&PixelSimulation>,
 ) {
+    let sim = pixel_query.single();
+
     // Create a rectangle for each chunk
     for x in 0..CHUNKS.0 {
         for y in 0..CHUNKS.1 {
             let pos_x = ((x as f32 * CHUNK_SIZE.0 as f32) - WORLD_SIZE.0 as f32 / 2.0) + CHUNK_SIZE.0 as f32 / 2.0;
             let pos_y = ((y as f32 * CHUNK_SIZE.1 as f32) - WORLD_SIZE.1 as f32 / 2.0) + CHUNK_SIZE.1 as f32 / 2.0;
+            let chunk = sim.world.get_chunk(x, y).unwrap();
+
+            // Red if asleep, green if awake
+            let color = if chunk.lock().unwrap().awake_next {
+                Color::rgba(0.0, 1.0, 0.0, 0.5)
+            } else {
+                Color::rgba(1.0, 0.0, 0.0, 0.5)
+            };
 
             chunk_gizmos.rect_2d(
                 Vec2::new(pos_x, pos_y),
                 0.0,
                 Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
-                Color::rgba(1.0, 0.0, 0.0, 0.5),
+                color,
             );
         }
     }

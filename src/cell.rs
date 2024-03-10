@@ -67,6 +67,8 @@ impl From<CellType> for Cell {
             CellType::Empty => Self::empty(),
             CellType::Sand => Self::new(CellType::Sand,
                  DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT),
+            CellType::Dirt => Self::new(CellType::Dirt,
+                 DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT),
             CellType::Stone => Self::new(CellType::Stone,
                  DirectionType::NONE),
             CellType::Water => Self::new(CellType::Water,
