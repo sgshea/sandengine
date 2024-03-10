@@ -45,7 +45,7 @@ fn main() {
         .add_systems(Update, egui_ui)
         .add_systems(Update, cell_selector_ui)
         .add_systems(Update, resize_window)
-        // .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config))
+        .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config))
         .run();
 }
 
