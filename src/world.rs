@@ -114,11 +114,6 @@ impl PixelWorld {
         }
     }
 
-    pub fn move_cell_same_chunk(&self, x: i32, y: i32, xto: i32, yto: i32, chunk: &mut PixelChunk) {
-        let from_idx = chunk.get_index(x, y);
-        chunk.changes.push((None, from_idx, chunk.get_index(xto, yto)));
-    }
-
     pub fn chunk_to_world_coords(&self, chunk_pos: (i32, i32), cell_pos: (i32, i32)) -> (i32, i32) {
         (chunk_pos.0 * self.c_width + cell_pos.0, chunk_pos.1 * self.c_height + cell_pos.1)
     }

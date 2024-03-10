@@ -1,24 +1,39 @@
 use bitflags::bitflags;
 use rand::Rng;
+use strum::{EnumIter, VariantNames};
 
 // Maximum density of a cell
 const MAX_DENSITY: f32 = 100.0;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, EnumIter, VariantNames)]
 pub enum CellType {
     Empty,
     Sand,
+    Dirt,
     Stone,
     Water,
 }
 
 impl CellType {
+    // Density is how likely a cell is to move through liquids
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
-            CellType::Sand => 60.0,
+            CellType::Sand => 40.0,
+            CellType::Dirt => 70.0,
             CellType::Stone => 100.0,
             CellType::Water => 30.0,
+        }
+    }
+
+    // Inertia is how likely a cell will choose to stay in place (not look sideways for a new cell to move to)
+    pub fn cell_inertia(&self) -> f32 {
+        match self {
+            CellType::Empty => 0.0,
+            CellType::Sand => 0.5,
+            CellType::Dirt => 0.65,
+            CellType::Stone => 0.9,
+            CellType::Water => 0.1,
         }
     }
 
@@ -31,6 +46,14 @@ impl CellType {
                     (230 + trng.gen_range(-20..20)) as u8,
                     (195 + trng.gen_range(-20..20)) as u8,
                     (92 + trng.gen_range(-20..20)) as u8,
+                    255,
+                ]
+            },
+            CellType::Dirt => {
+                [
+                    (139 + trng.gen_range(-10..10)) as u8,
+                    (69 + trng.gen_range(-10..10)) as u8,
+                    (19 + trng.gen_range(-10..10)) as u8,
                     255,
                 ]
             },
@@ -89,6 +112,7 @@ impl From<CellType> for StateType {
         match ctype {
             CellType::Empty => StateType::Empty(ctype),
             CellType::Sand => StateType::SoftSolid(ctype),
+            CellType::Dirt => StateType::SoftSolid(ctype),
             CellType::Stone => StateType::HardSolid(ctype),
             CellType::Water => StateType::Liquid(ctype),
         }

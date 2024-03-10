@@ -2,7 +2,7 @@ use std::{mem, sync::{Arc, Mutex}};
 
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{should_move_density, CellType}};
+use crate::{cell::Cell, cell_types::CellType};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
@@ -15,6 +15,9 @@ pub struct PixelChunk {
     pub cells: Vec<Cell>,
 
     pub changes: Vec<(Option<Arc<Mutex<PixelChunk>>>, usize, usize)>,
+
+    pub awake: bool,
+    pub awake_next: bool,
 }
 
 impl PixelChunk {
@@ -28,6 +31,8 @@ impl PixelChunk {
             pos_y,
             cells,
             changes: Vec::new(),
+            awake: true,
+            awake_next: true,
         };
         
         s
@@ -49,17 +54,9 @@ impl PixelChunk {
         x >= 0 && x < self.width && y >= 0 && y < self.height
     }
 
-    fn in_bounds_world(&self, x: i32, y: i32) -> bool {
+    pub fn in_bounds_world(&self, x: i32, y: i32) -> bool {
         let idx = self.get_index(x, y);
         idx < self.cells.len()
-    }
-
-    pub fn can_move_to(&self, density_from: f32, xto: i32, yto: i32) -> bool {
-        if self.in_bounds_world(xto, yto) {
-            let cell = self.cells[self.get_index(xto, yto)];
-            return cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density());
-        }
-        false
     }
 
     pub fn is_empty(&self, x: i32, y: i32) -> bool {
@@ -84,6 +81,7 @@ impl PixelChunk {
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
         if idx < self.cells.len() {
             self.cells[idx] = cell;
+            self.awake_next = true;
         }
     }
 
@@ -113,9 +111,6 @@ impl PixelChunk {
 
         // Iterate over sorted moves and pick random source to move from each time
         let mut iprev = 0;
-        if self.changes.len() == 0 {
-            return;
-        }
         for i in 0..self.changes.len() {
             if i == self.changes.len() - 1 || self.changes[i + 1].2 != self.changes[i].2 {
                 let rand = iprev + rand::thread_rng().gen_range(0..=(i - iprev));
