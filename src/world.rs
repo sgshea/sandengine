@@ -39,6 +39,18 @@ impl PixelWorld {
         new_world
     }
 
+    // Get locations of all chunks that are awake
+    pub fn get_awake_chunk_locs(&self) -> Vec<(i32, i32)> {
+        self.chunks.iter().filter_map(|chunk| {
+            let chunk = chunk.lock().unwrap();
+            if chunk.awake {
+                Some((chunk.pos_x, chunk.pos_y))
+            } else {
+                None
+            }
+        }).collect()
+    }
+
     pub fn get_chunk_direct(&self, x: i32, y: i32) -> Option<Arc<Mutex<PixelChunk>>> {
         self.chunks_lookup.get(&(x, y)).map(|c| c.clone())
     }
@@ -109,6 +121,7 @@ impl PixelWorld {
                 let from_idx = chunk.get_index(x, y);
                 let to_idx = chunk_to_m.get_index(xto, yto);
                 chunk_to_m.changes.push((chunk_from, from_idx, to_idx));
+                chunk_to_m.awake = true;
             },
             None => {}
         }

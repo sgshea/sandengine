@@ -4,7 +4,7 @@ use bevy_mod_picking::backends::egui::bevy_egui;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNKS, CHUNK_SIZE, WORLD_SIZE};
+use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {
@@ -46,6 +46,8 @@ pub struct DebugInfo {
     pub chunk_position: Vec2,
     pub cell_position_in_chunk: Vec2,
     pub hovered_cell: Option<Cell>,
+
+    pub show_gizmos: bool,
 }
 
 impl DebugInfo {
@@ -77,8 +79,9 @@ pub fn cell_at_pos_dbg(
 
 pub fn egui_ui(
     mut ctx: EguiContexts,
-    dbg_info: ResMut<DebugInfo>,
+    mut dbg_info: ResMut<DebugInfo>,
 ) {
+
     egui::Window::new("Debug Info")
     .show(ctx.ctx_mut(),
         |ui| {
@@ -90,9 +93,13 @@ pub fn egui_ui(
             ui.label(format!("Render Construct Time: {:.2}ms", render_construct_t_ms));
             ui.label(format!("FPS: {:.2}", 1.0 / dbg_info.average_frame_time()));
             ui.label(format!("Position: {:?}", dbg_info.position));
+            ui.label(format!("Hovered Cell: {:?}", dbg_info.hovered_cell));
+
+            ui.separator();
+            ui.heading("Chunk Information");
             ui.label(format!("Chunk Position: {:?}", dbg_info.chunk_position));
             ui.label(format!("Cell Position in Chunk: {:?}", dbg_info.cell_position_in_chunk));
-            ui.label(format!("Hovered Cell: {:?}", dbg_info.hovered_cell));
+            ui.checkbox(&mut dbg_info.show_gizmos, "Show Active Chunks");
         }
     );
 }
@@ -123,36 +130,34 @@ pub fn draw_chunk_gizmos(
 ) {
     let sim = pixel_query.single();
 
-    // Create a rectangle for each chunk
-    for x in 0..CHUNKS.0 {
-        for y in 0..CHUNKS.1 {
-            let pos_x = ((x as f32 * CHUNK_SIZE.0 as f32) - WORLD_SIZE.0 as f32 / 2.0) + CHUNK_SIZE.0 as f32 / 2.0;
-            let pos_y = ((y as f32 * CHUNK_SIZE.1 as f32) - WORLD_SIZE.1 as f32 / 2.0) + CHUNK_SIZE.1 as f32 / 2.0;
-            let chunk = sim.world.get_chunk(x, y).unwrap();
+    let awake_chunks = sim.world.get_awake_chunk_locs();
 
-            // Red if asleep, green if awake
-            let color = if chunk.lock().unwrap().awake_next {
-                Color::rgba(0.0, 1.0, 0.0, 0.5)
-            } else {
-                Color::rgba(1.0, 0.0, 0.0, 0.5)
-            };
-
-            chunk_gizmos.rect_2d(
-                Vec2::new(pos_x, pos_y),
-                0.0,
-                Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
-                color,
-            );
-        }
+    // Draw a green rectangle for each awake chunk
+    for (x, y) in awake_chunks {
+        let pos_x = ((x as f32 * CHUNK_SIZE.0 as f32) - WORLD_SIZE.0 as f32 / 2.0) + CHUNK_SIZE.0 as f32 / 2.0;
+        let pos_y = ((y as f32 * CHUNK_SIZE.1 as f32) - WORLD_SIZE.1 as f32 / 2.0) + CHUNK_SIZE.1 as f32 / 2.0;
+        chunk_gizmos.rect_2d(
+            Vec2::new(pos_x, pos_y),
+            0.0,
+            Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
+            Color::rgba(0.0, 1.0, 0.0, 0.5),
+        );
     }
 }
 
 pub fn update_gizmos_config(
     mut config_store: ResMut<GizmoConfigStore>,
+    mut dbg_info: ResMut<DebugInfo>,
     keyboard: Res<ButtonInput<KeyCode>>,
 ) {
     let (chunk_config, _) = config_store.config_mut::<ChunkGizmos>();
+    if dbg_info.show_gizmos {
+        chunk_config.enabled = true;
+    } else {
+        chunk_config.enabled = false;
+    }
     if keyboard.just_pressed(KeyCode::Digit0) {
         chunk_config.enabled ^= true;
+        dbg_info.show_gizmos = chunk_config.enabled;
     }
 }
