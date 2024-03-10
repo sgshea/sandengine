@@ -16,6 +16,11 @@ impl ChunkWorker<'_> {
 
     pub fn update_chunk(&self) {
         let mut chunk = self.chunk.lock().unwrap();
+        if !chunk.awake {
+            chunk.awake = chunk.awake_next;
+            return;
+        }
+
         for x in 0..chunk.width {
             for y in 0..chunk.height {
                 let cell = chunk.cells[chunk.get_index(x, y)];
@@ -38,8 +43,8 @@ impl ChunkWorker<'_> {
             }
         }
 
+        chunk.awake_next = if chunk.changes.is_empty() { false } else { true };
         chunk.awake = chunk.awake_next;
-        chunk.awake_next = if chunk.changes.len() > 0 { true } else { false };
     }
 
     fn move_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
