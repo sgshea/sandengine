@@ -47,9 +47,50 @@ impl ChunkWorker<'_> {
         chunk.awake = chunk.awake_next;
     }
 
+    // Expects chunk pos
+    fn wake_chunk_in_direction(&self, x: i32, y: i32, direction: DirectionType) {
+        let (x, y) = match direction {
+            DirectionType::UP => (x, y + 1),
+            DirectionType::DOWN => (x, y - 1),
+            DirectionType::LEFT => (x - 1, y),
+            DirectionType::RIGHT => (x + 1, y),
+            // Trying to lock diagonals causes a deadlock
+            _ => return
+        };
+        if let Some(chunk) = self.world.get_chunk_direct(x, y) {
+            let mut chunk = chunk.lock().unwrap();
+            chunk.awake= true;
+        }
+    }
+
+    fn wake_chunk_helper(&self, chunk: &PixelChunk, x: i32, y: i32) {
+        let (x, y) = world_to_chunk_coords(chunk, x, y);
+
+        if y >= chunk.height - 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::UP);
+        } if x <= 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::LEFT);
+        } if x >= chunk.width - 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::RIGHT);
+        } if x <= 2 && y >= chunk.height - 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::UP_LEFT);
+        } if x >= chunk.width - 2 && y >= chunk.height - 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::UP_RIGHT);
+        } if x <= 2 && y <= 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::DOWN_LEFT);
+        } if x >= chunk.width - 1 && y <= 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::DOWN_RIGHT);
+        } if y <= 1 {
+            self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::DOWN);
+        }
+    }
+
     fn move_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
         if self.world.inside_chunk(chunk, (x, y - 1)) {
             if can_move_to(chunk, density, x, y - 1) {
+                // Awake chunk above if at top of this chunk
+                self.wake_chunk_helper(chunk, x, y);
+
                 self.move_cell_same_chunk(x, y, x, y - 1, chunk);
                 return true;
             }
@@ -206,4 +247,9 @@ fn can_move_to_world(world: &PixelWorld, density_from: f32, xto: i32, yto: i32) 
         Some(cell) => cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density()),
         None => false
     }
+}
+
+#[inline]
+fn world_to_chunk_coords(chunk: &PixelChunk, x: i32, y: i32) -> (i32, i32) {
+    (x % chunk.width, y % chunk.height)
 }
