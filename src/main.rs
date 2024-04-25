@@ -3,6 +3,7 @@ mod cell_types;
 mod world;
 mod chunk;
 mod cworker;
+mod cell_effect;
 
 mod debug_ui;
 

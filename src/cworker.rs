@@ -1,11 +1,10 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
-use rand::Rng;
-
-use crate::{cell_types::{should_move_density, CellType, DirectionType}, chunk::PixelChunk, world::PixelWorld};
+use crate::{cell::Cell, cell_effect::*, cell_types::{should_move_density, CellType, DirectionType}, chunk::PixelChunk, world::PixelWorld};
 
 pub struct ChunkWorker<'a> {
-    world: &'a PixelWorld,
+    pub world: &'a PixelWorld,
+    // Chunk to work on
     chunk: Arc<Mutex<PixelChunk>>,
 }
 
@@ -21,30 +20,59 @@ impl ChunkWorker<'_> {
             return;
         }
 
+        // movement
+        let movement_effect = MovementEffect;
         for x in 0..chunk.width {
             for y in 0..chunk.height {
-                let cell = chunk.cells[chunk.get_index(x, y)];
-                let cell_movement = cell.get_movement();
-                let density = cell.get_density();
-
                 let (x, y) = self.world.chunk_to_world_coords((chunk.pos_x, chunk.pos_y), (x, y));
+                let surrounding_cells = self.get_surrounding_cells(x, y, &chunk);
 
-                if cell_movement.intersects(DirectionType::DOWN) && self.move_down(x, y, density, &mut chunk) {
-                    continue;
-                } if cell_movement.intersects(DirectionType::UP) && self.move_up(x, y, density, &mut chunk) {
-                    continue;
-                } if cell_movement.intersects(DirectionType::LEFT | DirectionType::RIGHT) && self.move_side(x, y, density, &mut chunk){
-                    continue;
-                } if cell_movement.intersects(DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT) && self.move_diagonal_down(x, y, density, &mut chunk) {
-                    continue;
-                } if cell_movement.intersects(DirectionType::UP_LEFT | DirectionType::UP_RIGHT) && self.move_diagonal_up(x, y, density, &mut chunk) {
-                    continue;
-                }
+                movement_effect.apply(chunk.cells[chunk.get_index(x, y)], (x, y), surrounding_cells, self, &mut chunk);
             }
         }
 
         chunk.awake_next = if chunk.changes.is_empty() { false } else { true };
         chunk.awake = chunk.awake_next;
+    }
+
+    fn get_surrounding_cells(&self, x: i32, y: i32, chunk: &PixelChunk) -> Vec<(DirectionType, Cell)> {
+        let mut cells = Vec::new();
+        for direction in DirectionType::all() {
+            let (dx, dy) = direction.get_tuple_direction();
+            let x = x + dx;
+            let y = y + dy;
+            if chunk.in_bounds_world(x, y) {
+                let idx = chunk.get_index(x, y);
+                cells.push((direction, chunk.cells[idx].clone()));
+            }
+            // } else if let Some(chunk) = self.world.get_chunk(x, y) {
+            //     match chunk.lock() {
+            //         Ok(chunk) => {
+            //             let idx = chunk.get_index(x, y);
+            //             cells.push((direction, chunk.cells[idx].clone()));
+            //         },
+            //         Err(_) => {}
+            //     }
+            // }
+        }
+        cells
+    }
+
+    // Abstraction to move a cell, handles going to different chunks
+    pub fn move_cell(&self, original_loc: (i32, i32), direction: DirectionType, chunk: &mut PixelChunk ) {
+        // Get tuple direction
+        let (dx, dy) = direction.get_tuple_direction();
+        // Get new location
+        let new_loc = (original_loc.0 + dx, original_loc.1 + dy);
+        if self.world.inside_chunk(&chunk, new_loc) {
+            self.move_cell_same_chunk(original_loc.0, original_loc.1, new_loc.0, new_loc.1, chunk);
+            // Wake up surrounding chunks
+            self.wake_chunk_helper(chunk, new_loc.0, new_loc.1);
+        } else {
+            self.world.move_cell_diff_chunk(original_loc.0, original_loc.1, new_loc.0, new_loc.1, chunk);
+            // Wake up surrounding chunks
+            self.wake_chunk_helper(chunk, new_loc.0, new_loc.1);
+        }
     }
 
     // Expects chunk pos
@@ -66,7 +94,7 @@ impl ChunkWorker<'_> {
     fn wake_chunk_helper(&self, chunk: &PixelChunk, x: i32, y: i32) {
         let (x, y) = world_to_chunk_coords(chunk, x, y);
 
-        if y >= chunk.height - 1 {
+        if y >= chunk.height - 3 {
             self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::UP);
         } if x <= 1 {
             self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::LEFT);
@@ -84,168 +112,9 @@ impl ChunkWorker<'_> {
             self.wake_chunk_in_direction(chunk.pos_x, chunk.pos_y, DirectionType::DOWN);
         }
     }
-
-    fn move_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
-        if self.world.inside_chunk(chunk, (x, y - 1)) {
-            if can_move_to(chunk, density, x, y - 1) {
-                // Awake chunk above if at top of this chunk
-                self.wake_chunk_helper(chunk, x, y);
-
-                self.move_cell_same_chunk(x, y, x, y - 1, chunk);
-                return true;
-            }
-        } else if self.world.chunk_exists_at_world_coord(x, y - 1) {
-            if can_move_to_world(self.world, density, x, y - 1) {
-                self.world.move_cell_diff_chunk(x, y, x, y - 1, chunk);
-                return true;
-            }
-        }
-        false
-    }
-
-    fn move_up(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
-        if self.world.inside_chunk(chunk, (x, y + 1)) {
-            if can_move_to(chunk, density, x, y + 1) {
-                self.move_cell_same_chunk(x, y, x, y + 1, chunk);
-                return true;
-            }
-        } else if self.world.chunk_exists_at_world_coord(x, y + 1) {
-            if self.world.is_empty(x, y + 1) {
-                self.world.move_cell_diff_chunk(x, y, x, y + 1, chunk);
-                return true;
-            }
-        }
-        false
-    }
-
-    fn move_diagonal_down(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
-        let (mut down_left, down_left_inside) = {
-            if self.world.inside_chunk(chunk, (x - 1, y - 1)) {
-                (can_move_to(chunk, density, x - 1, y - 1), true)
-            } else {
-                (can_move_to_world(self.world, density, x - 1, y - 1), false)
-            }
-        };
-        let (mut down_right, down_right_inside) = {
-            if self.world.inside_chunk(chunk, (x + 1, y - 1)) {
-                (can_move_to(chunk, density, x + 1, y - 1), true)
-            } else {
-                (can_move_to_world(self.world, density, x + 1, y - 1), false)
-            }
-        };
-        if down_left && down_right {
-            down_left = rand::thread_rng().gen_bool(0.5);
-            down_right = !down_left;
-        }
-
-        if down_left && down_left_inside {
-            self.move_cell_same_chunk(x, y, x - 1, y - 1, chunk);
-        }
-        else if down_right && down_right_inside {
-            self.move_cell_same_chunk(x, y, x + 1, y - 1, chunk);
-        }
-        else if down_left {
-            self.world.move_cell_diff_chunk(x, y, x - 1, y - 1, chunk);
-        }
-        else if down_right {
-            self.world.move_cell_diff_chunk(x, y, x + 1, y - 1, chunk);
-        }
-
-        down_left || down_right
-    }
-
-    fn move_diagonal_up(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
-        let (mut up_left, up_left_inside) = {
-            if self.world.inside_chunk(chunk, (x - 1, y + 1)) {
-                (can_move_to(chunk, density, x - 1, y + 1), true)
-            } else {
-                (can_move_to_world(self.world, density, x - 1, y + 1), false)
-            }
-        };
-        let (mut up_right, up_right_inside) = {
-            if self.world.inside_chunk(chunk, (x + 1, y + 1)) {
-                (can_move_to(chunk, density, x + 1, y + 1), true)
-            } else {
-                (can_move_to_world(self.world, density, x + 1, y + 1), false)
-            }
-        };
-        if up_left && up_right {
-            up_left = rand::thread_rng().gen_bool(0.5);
-            up_right = !up_left;
-        }
-
-        if up_left && up_left_inside {
-            self.move_cell_same_chunk(x, y, x - 1, y + 1, chunk);
-        }
-        else if up_right && up_right_inside {
-            self.move_cell_same_chunk(x, y, x + 1, y + 1, chunk);
-        }
-        else if up_left {
-            self.world.move_cell_diff_chunk(x, y, x - 1, y + 1, chunk);
-        }
-        else if up_right {
-            self.world.move_cell_diff_chunk(x, y, x + 1, y + 1, chunk);
-        }
-
-        up_left || up_right
-    }
-
-    fn move_side(&self, x: i32, y: i32, density: f32, chunk: &mut PixelChunk) -> bool {
-        let (mut left, left_inside) = {
-            if self.world.inside_chunk(chunk, (x - 1, y)) {
-                (can_move_to(chunk, density, x - 1, y), true)
-            } else {
-                (can_move_to_world(self.world, density, x - 1, y), false)
-            }
-        };
-        let (mut right, right_inside) = {
-            if self.world.inside_chunk(chunk, (x + 1, y)) {
-                (can_move_to(chunk, density, x + 1, y), true)
-            } else {
-                (can_move_to_world(self.world, density, x + 1, y), false)
-            }
-        };
-        if left && right {
-            left = rand::thread_rng().gen_bool(0.5);
-            right = !left;
-        }
-
-        if left && left_inside {
-            self.move_cell_same_chunk(x, y, x - 1, y, chunk);
-        }
-        else if right && right_inside {
-            self.move_cell_same_chunk(x, y, x + 1, y, chunk);
-        }
-        else if left {
-            self.world.move_cell_diff_chunk(x, y, x - 1, y, chunk);
-        }
-        else if right {
-            self.world.move_cell_diff_chunk(x, y, x + 1, y, chunk);
-        }
-
-        left || right
-    }
-
     pub fn move_cell_same_chunk(&self, x: i32, y: i32, xto: i32, yto: i32, chunk: &mut PixelChunk) {
         let from_idx = chunk.get_index(x, y);
         chunk.changes.push((None, from_idx, chunk.get_index(xto, yto)));
-    }
-}
-
-#[inline]
-fn can_move_to(chunk: &PixelChunk, density_from: f32, xto: i32, yto: i32) -> bool {
-    if chunk.in_bounds_world(xto, yto) {
-        let cell = chunk.cells[chunk.get_index(xto, yto)];
-        return cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density());
-    }
-    false
-}
-
-#[inline]
-fn can_move_to_world(world: &PixelWorld, density_from: f32, xto: i32, yto: i32) -> bool {
-    match world.get_cell(xto, yto) {
-        Some(cell) => cell.get_type() == CellType::Empty || should_move_density(density_from, cell.get_density()),
-        None => false
     }
 }
 
