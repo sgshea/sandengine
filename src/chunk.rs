@@ -1,7 +1,3 @@
-use std::{mem, sync::{Arc, Mutex}};
-
-use rand::Rng;
-
 use crate::{cell::Cell, cell_types::CellType};
 
 #[derive(Debug, Clone)]
@@ -13,8 +9,6 @@ pub struct PixelChunk {
     pub pos_y: i32,
 
     pub cells: Vec<Cell>,
-
-    pub changes: Vec<(Option<Arc<Mutex<PixelChunk>>>, usize, usize)>,
 
     pub awake: bool,
     pub awake_next: bool,
@@ -30,7 +24,6 @@ impl PixelChunk {
             pos_x,
             pos_y,
             cells,
-            changes: Vec::new(),
             awake: true,
             awake_next: true,
         };
@@ -78,6 +71,20 @@ impl PixelChunk {
         }
     }
 
+    pub fn get_cell_mut(&mut self, idx: usize) -> &mut Cell {
+        &mut self.cells[idx]
+    }
+
+    pub fn get_cell_mut_2d(&mut self, x: i32, y: i32) -> &mut Cell {
+        let idx = self.get_index(x, y);
+        if idx < self.cells.len() {
+            &mut self.cells[idx]
+        } else {
+            println!("Index out of bounds: {} {} {}", x, y, idx);
+            panic!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
+        }
+    }
+
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
         if idx < self.cells.len() {
             self.cells[idx] = cell;
@@ -96,38 +103,77 @@ impl PixelChunk {
         }
     }
 
-    fn swap_cells_diff_chunk(&mut self, src: usize, dst: usize, chunk: Arc<Mutex<PixelChunk>>) {
-        let mut chunk = chunk.lock().unwrap();
-        mem::swap(&mut self.cells[dst], &mut chunk.cells[src]);
+    pub fn split_top_bot(&mut self) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+        let mid = self.cells.len() / 2;
+        let (top, bottom) = self.cells.split_at_mut(mid);
+        (top.iter_mut().collect(), bottom.iter_mut().collect())
     }
 
-    fn swap_cells(&mut self, src: usize, dst: usize) {
-        self.cells.swap(src, dst);
-    }
-
-    pub fn commit_cells(&mut self) {
-        // Sort by destination
-        self.changes.sort_by(|a, b| a.2.cmp(&b.2));
-
-        // Iterate over sorted moves and pick random source to move from each time
-        let mut iprev = 0;
-        for i in 0..self.changes.len() {
-            if i == self.changes.len() - 1 || self.changes[i + 1].2 != self.changes[i].2 {
-                let rand = iprev + rand::thread_rng().gen_range(0..=(i - iprev));
-
-                let dst = self.changes[rand].2;
-                let src = self.changes[rand].1;
-                match &self.changes[rand].0 {
-                    Some(chunk) => {
-                        self.swap_cells_diff_chunk(src, dst, chunk.clone());
-                    },
-                    None => {
-                        self.swap_cells(src, dst);
-                    }
+    pub fn get_side_cells(&mut self) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+        let side_length = (self.cells.len() as f64).sqrt() as usize;
+        let half = side_length / 2;
+        let mut cells_l = Vec::new();
+        let mut cells_r = Vec::new();
+    
+        for i in 0..side_length {
+            let start = i * side_length;
+            let ptr = self.cells.as_mut_ptr();
+    
+            // UNSAFE
+            // This is unsafe because it uses raw pointers and could possibly create invalid slices
+            // This is safe because cells is guaranteed to exist, and all elements are initialized
+            // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+                for cell in slice {
+                    cells_l.push(cell);
                 }
-                iprev = i + 1;
             }
         }
-        self.changes.clear();
+        for i in 0..side_length {
+            let start = i * side_length + half;
+            let ptr = self.cells.as_mut_ptr();
+    
+            // UNSAFE
+            // This is unsafe because it uses raw pointers and could possibly create invalid slices
+            // This is safe because cells is guaranteed to exist, and all elements are initialized
+            // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+            unsafe {
+                let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+                for cell in slice {
+                    cells_r.push(cell);
+                }
+            }
+        }
+
+        (cells_l, cells_r)
+    }
+}
+
+pub enum SplitChunk<'a> {
+    Entire(&'a mut PixelChunk),
+
+    TopBottom([Option<Vec<&'a mut Cell>>; 2]),
+
+    LeftRight([Option<Vec<&'a mut Cell>>; 2]),
+
+    // Forgoing corners for now
+    Corners([Option<Vec<&'a mut Cell>>; 4]),
+}
+
+impl SplitChunk<'_> {
+    // create from a mutable reference to a PixelChunk
+    pub fn from_chunk(chunk: &mut PixelChunk) -> SplitChunk {
+        SplitChunk::Entire(chunk)
+    }
+
+    pub fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
+        let (top, bottom) = chunk.split_top_bot();
+        SplitChunk::TopBottom([Some(top), Some(bottom)])
+    }
+
+    pub fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
+        let (left, right) = chunk.get_side_cells();
+        SplitChunk::LeftRight([Some(left), Some(right)])
     }
 }
