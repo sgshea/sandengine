@@ -73,7 +73,7 @@ pub fn cell_at_pos_dbg(
         dbg_info.position = pos;
         dbg_info.chunk_position = Vec2::new((pos.x / CHUNK_SIZE.0 as f32).floor(), (pos.y / CHUNK_SIZE.1 as f32).floor());
         dbg_info.cell_position_in_chunk = Vec2::new((pos.x % CHUNK_SIZE.0 as f32).floor(), (pos.y % CHUNK_SIZE.1 as f32).floor());
-        dbg_info.hovered_cell = Some(sim.world.get_cell(pos.x as i32, pos.y as i32).unwrap().clone());
+        dbg_info.hovered_cell = sim.world.get_cell(pos.x as i32, pos.y as i32).copied();
     }
 }
 
