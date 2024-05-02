@@ -76,3 +76,9 @@ impl From<CellType> for Cell {
         }
     }
 }
+
+impl Default for Cell {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
