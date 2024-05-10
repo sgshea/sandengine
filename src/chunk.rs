@@ -9,6 +9,8 @@ pub struct PixelChunk {
     pub pos_y: i32,
 
     pub cells: Vec<Cell>,
+    // Secondary buffer for next iteration
+    pub next_cells: Vec<Cell>,
 
     pub awake: bool,
     pub awake_next: bool,
@@ -24,6 +26,7 @@ impl PixelChunk {
             pos_x,
             pos_y,
             cells,
+            next_cells: vec![Cell::empty(); (height * width) as usize],
             awake: true,
             awake_next: true,
         };
@@ -87,7 +90,7 @@ impl PixelChunk {
 
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
         if idx < self.cells.len() {
-            self.cells[idx] = cell;
+            self.next_cells[idx] = cell;
             self.awake_next = true;
         }
     }
@@ -102,52 +105,53 @@ impl PixelChunk {
             self.set_cell(x, y, cell);
         }
     }
+}
 
-    pub fn split_top_bot(&mut self) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
-        let mid = self.cells.len() / 2;
-        let (top, bottom) = self.cells.split_at_mut(mid);
-        (top.iter_mut().collect(), bottom.iter_mut().collect())
-    }
+fn split_top_bottom_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+    let mid = cells.len() / 2;
+    let (top, bottom) = cells.split_at_mut(mid);
+    (top.iter_mut().collect(), bottom.iter_mut().collect())
+}
 
-    pub fn get_side_cells(&mut self) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
-        let side_length = (self.cells.len() as f64).sqrt() as usize;
-        let half = side_length / 2;
-        let mut cells_l = Vec::new();
-        let mut cells_r = Vec::new();
-    
-        for i in 0..side_length {
-            let start = i * side_length;
-            let ptr = self.cells.as_mut_ptr();
-    
-            // UNSAFE
-            // This is unsafe because it uses raw pointers and could possibly create invalid slices
-            // This is safe because cells is guaranteed to exist, and all elements are initialized
-            // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
-            unsafe {
-                let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
-                for cell in slice {
-                    cells_l.push(cell);
-                }
+fn split_left_right_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+    let side_length = (cells.len() as f64).sqrt() as usize;
+    let half = side_length / 2;
+    let mut cells_l = Vec::new();
+    let mut cells_r = Vec::new();
+
+    for i in 0..side_length {
+        let start = i * side_length;
+        let ptr = cells.as_mut_ptr();
+
+        // UNSAFE
+        // This is unsafe because it uses raw pointers and could possibly create invalid slices
+        // This is safe because cells is guaranteed to exist, and all elements are initialized
+        // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_l.push(cell);
             }
         }
-        for i in 0..side_length {
-            let start = i * side_length + half;
-            let ptr = self.cells.as_mut_ptr();
-    
-            // UNSAFE
-            // This is unsafe because it uses raw pointers and could possibly create invalid slices
-            // This is safe because cells is guaranteed to exist, and all elements are initialized
-            // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
-            unsafe {
-                let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
-                for cell in slice {
-                    cells_r.push(cell);
-                }
+    }
+    for i in 0..side_length {
+        let start = i * side_length + half;
+        let ptr = cells.as_mut_ptr();
+
+        // UNSAFE
+        // This is unsafe because it uses raw pointers and could possibly create invalid slices
+        // This is safe because cells is guaranteed to exist, and all elements are initialized
+        // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+        // Playground demonstration: https://gist.github.com/rust-play/00f1c05433719be6dc3add0b8c10df14
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_r.push(cell);
             }
         }
-
-        (cells_l, cells_r)
     }
+
+    (cells_l, cells_r)
 }
 
 pub enum SplitChunk<'a> {
@@ -157,23 +161,45 @@ pub enum SplitChunk<'a> {
 
     LeftRight([Option<Vec<&'a mut Cell>>; 2]),
 
-    // Forgoing corners for now
     Corners([Option<Vec<&'a mut Cell>>; 4]),
 }
 
 impl SplitChunk<'_> {
-    // create from a mutable reference to a PixelChunk
+    // Borrowing cells from the chunk
     pub fn from_chunk(chunk: &mut PixelChunk) -> SplitChunk {
         SplitChunk::Entire(chunk)
     }
 
-    pub fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
-        let (top, bottom) = chunk.split_top_bot();
+    fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
         SplitChunk::TopBottom([Some(top), Some(bottom)])
     }
 
-    pub fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
-        let (left, right) = chunk.get_side_cells();
+    fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
+        let (left, right) = split_left_right_cells(&mut chunk.cells);
         SplitChunk::LeftRight([Some(left), Some(right)])
+    }
+    // Borrowing future cells from the chunk
+    fn from_chunk_vert_next(chunk: &mut PixelChunk) -> SplitChunk {
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.next_cells);
+        SplitChunk::TopBottom([Some(top), Some(bottom)])
+    }
+
+    fn from_chunk_side_next(chunk: &mut PixelChunk) -> SplitChunk {
+        let (left, right) = split_left_right_cells(&mut chunk.next_cells);
+        SplitChunk::LeftRight([Some(left), Some(right)])
+    }
+
+    // Borrowing both current and future cells from the chunk
+    pub fn from_chunk_vert_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
+        let (top_next, bottom_next) = split_top_bottom_cells(&mut chunk.next_cells);
+        (SplitChunk::TopBottom([Some(top), Some(bottom)]), SplitChunk::TopBottom([Some(top_next), Some(bottom_next)]))
+    }
+
+    pub fn from_chunk_side_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
+        let (left, right) = split_left_right_cells(&mut chunk.cells);
+        let (left_next, right_next) = split_left_right_cells(&mut chunk.next_cells);
+        (SplitChunk::LeftRight([Some(left), Some(right)]), SplitChunk::LeftRight([Some(left_next), Some(right_next)]))
     }
 }
