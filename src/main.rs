@@ -17,8 +17,8 @@ use rayon::prelude::*;
 
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
-const WORLD_SIZE: (i32, i32) = (512, 512);
-const CHUNKS: (i32, i32) = (8, 8);
+const WORLD_SIZE: (i32, i32) = (256, 256);
+const CHUNKS: (i32, i32) = (4, 4);
 const CHUNK_SIZE: (i32, i32) = (WORLD_SIZE.0 / CHUNKS.0, WORLD_SIZE.1 / CHUNKS.1);
 
 fn main() {
@@ -40,12 +40,13 @@ fn main() {
         .init_gizmo_group::<ChunkGizmos>()
         .init_resource::<PixelSimulationInteraction>()
         .add_systems(Startup, setup_pixel_simulation)
-        .add_systems(FixedUpdate, update_pixel_simulation)
-        .add_systems(PostUpdate, render_pixel_simulation)
+        .add_systems(FixedUpdate, update_pixel_simulation.run_if(in_state(AppState::Running)))
+        .add_systems(PostUpdate, render_pixel_simulation.run_if(in_state(AppState::Running)))
         .add_systems(Update, egui_ui)
         .add_systems(Update, cell_selector_ui)
         .add_systems(Update, resize_window)
         .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config))
+        .init_state::<AppState>()
         .run();
 }
 
@@ -53,6 +54,13 @@ fn main() {
 pub struct PixelSimulation {
     pub world: world::PixelWorld,
     pub image_handle: Handle<Image>,
+}
+
+#[derive(States, Default, Debug, Hash, PartialEq, Eq, Clone, Copy)]
+enum AppState {
+    #[default]
+    Running,
+    Paused,
 }
 
 #[derive(Resource, Default)]

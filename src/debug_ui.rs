@@ -4,7 +4,7 @@ use bevy_mod_picking::backends::egui::bevy_egui;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{cell::Cell, cell_types::CellType, PixelSimulation, CHUNK_SIZE, WORLD_SIZE};
+use crate::{cell::Cell, cell_types::CellType, AppState, PixelSimulation, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {
@@ -17,7 +17,7 @@ impl Default for PixelSimulationInteraction {
     fn default() -> Self {
         PixelSimulationInteraction {
             selected_cell: CellType::Sand,
-            cell_amount: 10,
+            cell_amount: 12,
         }
     }
 }
@@ -46,6 +46,8 @@ pub struct DebugInfo {
     pub chunk_position: Vec2,
     pub cell_position_in_chunk: Vec2,
     pub hovered_cell: Option<Cell>,
+
+    pub is_paused: bool,
 
     pub show_gizmos: bool,
 }
@@ -80,12 +82,26 @@ pub fn cell_at_pos_dbg(
 pub fn egui_ui(
     mut ctx: EguiContexts,
     mut dbg_info: ResMut<DebugInfo>,
+    app_state: Res<State<AppState>>,
+    mut next_app_state: ResMut<NextState<AppState>>
 ) {
 
     egui::Window::new("Debug Info")
     .show(ctx.ctx_mut(),
         |ui| {
             ui.set_min_width(200.0);
+
+            ui.label(format!("Current State: {:?}", app_state.get()));
+            ui.checkbox(&mut dbg_info.is_paused, "Paused");
+            match dbg_info.is_paused {
+                true => {
+                    next_app_state.set(AppState::Paused);
+                },
+                false => {
+                    next_app_state.set(AppState::Running);
+                }
+            }
+
             // convert to ms
             let sim_t_ms = dbg_info.average_frame_time() * 1000.0;
             let render_construct_t_ms = dbg_info.average_render_construct_time() * 1000.0;
