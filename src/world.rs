@@ -11,6 +11,8 @@ pub struct PixelWorld {
     chunks_y: i32,
 
     chunks_lookup: HashMap<(i32, i32), PixelChunk>,
+
+    iteration: u32,
 }
 
 impl PixelWorld {
@@ -21,7 +23,8 @@ impl PixelWorld {
             c_width: t_width / chunks_y,
             chunks_x,
             chunks_y,
-            chunks_lookup: HashMap::new()
+            chunks_lookup: HashMap::new(),
+            iteration: 0
         };
 
         // create chunks
@@ -92,34 +95,50 @@ impl PixelWorld {
     // Update cells
     pub fn update(&mut self) {
         let all_pos = self.chunks_lookup.keys().map(|pos| *pos).collect::<Vec<(i32, i32)>>();
-        for x in 0..2 {
-            for y in 0..2 {
+
+        // Iterate in
+        for x in 0..=1 {
+            for y in 0..=1 {
                 let iteration_x_y = (x, y);
                 let chunks = &mut self.chunks_lookup;
-                let mut chunk_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-                get_chunk_references(chunks, &mut chunk_references, iteration_x_y);
+                let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+                let mut future_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+                get_chunk_references(chunks, &mut current_references, &mut future_references, iteration_x_y);
 
                 let mut workers: Vec<ChunkWorker> = Vec::new();
                 all_pos.iter().for_each(|pos| {
                     let x = (pos.0 + iteration_x_y.0) % 2 == 0;
                     let y = (pos.1 + iteration_x_y.1) % 2 == 0;
                     if x && y {
-                        // Use remove and take to get the references from the hashmap into a worker
-                        workers.push(ChunkWorker::new_from_chunk_ref(pos, &mut chunk_references));
+                        // Lifetime explanation:
+                        // we can borrow on each iteration because no references to the hashmap items are kept
+                        // the ChunkWorker removes the center chunk from the hashmap, so we can borrow the hashmap again
+                        // the needed parts of the SplitChunk are also removed from the hashmap using mem::take and similarly not kept in the hashmaps
+                        workers.push(ChunkWorker::new_from_chunk_ref(pos, &mut current_references, &mut future_references, self.iteration % 2 == 0));
                     }
                 });
-                workers.par_iter_mut().for_each(|worker| {
+                workers.iter_mut().for_each(|worker| {
                     worker.update();
                 });
             }
         }
+        // reset updated_at and swap buffers
+        self.chunks_lookup.values_mut().par_bridge().for_each(|chunk| {
+            chunk.cells.iter_mut().for_each(|cell| {
+                cell.updated = 0;
+            });
+            // swap buffers
+            chunk.cells.clone_from_slice(&chunk.next_cells);
+        });
+        self.iteration += 1;
     }
 }
 
 // Turns all chunks into split chunks
 fn get_chunk_references<'a>(
     chunks: &'a mut HashMap<(i32, i32), PixelChunk>,
-    references: &mut HashMap<(i32, i32), SplitChunk<'a>>,
+    current_references: &mut HashMap<(i32, i32), SplitChunk<'a>>,
+    future_references: &mut HashMap<(i32, i32), SplitChunk<'a>>,
     iteration_x_y: (i32, i32),
 ) {
     chunks.iter_mut().for_each(|(pos, chunk)| {
@@ -128,16 +147,21 @@ fn get_chunk_references<'a>(
 
         match (x, y) {
             (true, true) => {
-                references.insert(*pos, SplitChunk::from_chunk(chunk));
+                // for the 'center' chunks, because SplitChunk references the whole chunk, we just insert into the current references
+                current_references.insert(*pos, SplitChunk::from_chunk(chunk));
             },
             (false, true) => {
-                references.insert(*pos, SplitChunk::from_chunk_side(chunk));
+                let (cur, fut) = SplitChunk::from_chunk_side_both(chunk);
+                current_references.insert(*pos, cur);
+                future_references.insert(*pos, fut);
             },
             (true, false) => {
-                references.insert(*pos, SplitChunk::from_chunk_vert(chunk));
+                let (cur, fut) = SplitChunk::from_chunk_vert_both(chunk);
+                current_references.insert(*pos, cur);
+                future_references.insert(*pos, fut);
             },
             (false, false) => {
-                // CORNER (not implemented yet)
+                // references.insert(*pos, SplitChunk::from_chunk_corners(chunk));
             },
         }
     });
