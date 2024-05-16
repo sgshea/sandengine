@@ -5,7 +5,7 @@ use strum::{EnumIter, VariantNames};
 // Maximum density of a cell
 const MAX_DENSITY: f32 = 100.0;
 
-#[derive(Clone, Copy, PartialEq, Debug, EnumIter, VariantNames)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
 pub enum CellType {
     Empty,
     Sand,
@@ -19,10 +19,10 @@ impl CellType {
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
-            CellType::Sand => 40.0,
-            CellType::Dirt => 70.0,
+            CellType::Sand => 60.0,
+            CellType::Dirt => 60.0,
             CellType::Stone => 100.0,
-            CellType::Water => 30.0,
+            CellType::Water => 50.0,
         }
     }
 
@@ -77,28 +77,9 @@ impl CellType {
     }
 }
 
-// Computes a chance to move based on differing densities of cells
-// If the density of the cell we're moving from is greater than the density of the cell we're moving to,
-// then we have a chance to move based on the difference in densities
-//
-// Basically: the greater the difference in densities, the faster a cell will move through another cell
-pub fn should_move_density(density_from: f32, density_to: f32) -> bool {
-    if density_from < density_to {
-        return false;
-    }
-
-    let density_diff = density_from - density_to;
-    let move_probability = density_diff.abs() / MAX_DENSITY;
-
-    let mut trng = rand::thread_rng();
-    let random_number: f32 = trng.gen_range(0.0..1.0);
-
-    random_number < move_probability
-}
-
 // What kind of cell state is it?
 // Used to determine simple behaviors, but allows access to a more specific CellType
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StateType {
     Empty(CellType),
     SoftSolid(CellType), // Soft solid, like sand that can move

@@ -124,11 +124,8 @@ impl PixelWorld {
         }
         // reset updated_at and swap buffers
         self.chunks_lookup.values_mut().par_bridge().for_each(|chunk| {
-            chunk.cells.iter_mut().for_each(|cell| {
-                cell.updated = 0;
-            });
             // swap buffers
-            chunk.cells.clone_from_slice(&chunk.next_cells);
+            chunk.cells = chunk.next_cells.clone();
         });
         self.iteration += 1;
     }
