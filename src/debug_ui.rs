@@ -29,9 +29,14 @@ pub fn place_cells_at_pos(
     cell_type: CellType,
 ) {
     let amt_to_place_quarter = amt_to_place / 4;
+    let amt_to_place_half = amt_to_place / 2;
     for mut sim in sim.iter_mut() {
-        for x in -amt_to_place_quarter..amt_to_place_quarter {
-            for y in -amt_to_place_quarter..amt_to_place_quarter {
+        for x in -amt_to_place_half..=amt_to_place_half {
+            for y in -amt_to_place_half..amt_to_place_half {
+                // Make circle
+                if (x * x) + (y * y) > amt_to_place_quarter * amt_to_place_quarter {
+                    continue;
+                }
                 sim.world.set_cell(pos.x as i32 + x, pos.y as i32 + y, Cell::from(cell_type));
             }
         }

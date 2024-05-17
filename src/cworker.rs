@@ -5,8 +5,6 @@ use rand::Rng;
 
 use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
 
-// Maximum Speed constant
-const MAX_SPEED: f32 = 8.0;
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
     surrounding_current: HashMap<(i32, i32), Option<Vec<&'a mut Cell>>>,
@@ -34,14 +32,8 @@ impl<'a> ChunkWorker<'a> {
 
     pub fn update(&mut self) {
         for y in 0..self.chunk.height {
-            if self.iter_dir && y % 2 == 0 {
-                for x in 0..self.chunk.width {
-                    self.update_cell(x, y);
-                }
-            } else {
-                for x in (0..self.chunk.width).rev() {
-                    self.update_cell(x, y);
-                }
+            for x in 0..self.chunk.width {
+                self.update_cell(x, y);
             }
         }
     }
@@ -63,6 +55,20 @@ impl<'a> ChunkWorker<'a> {
                 if self.downward_fall(&idx) {
                     return;
                 }
+                if self.apply_velocity(&idx) {
+                    return;
+                }
+                if self.down_side(&idx) {
+                    return;
+                }
+            }
+            StateType::Liquid(_) => {
+                let idx = self.get_worker_index(x, y);
+                self.add_gravity(&idx);
+                if self.downward_fall(&idx) {
+                    return;
+                }
+                self.add_liquid_movement(&idx);
                 if self.apply_velocity(&idx) {
                     return;
                 }
@@ -203,8 +209,8 @@ impl<'a> ChunkWorker<'a> {
         // we want to swap down if the cell below has a lower density AND the one below that has a higher density (else want to become particle like)
         if down_next.is_some_and(|t| t.get_density() < cell.get_density()) {
             let new_idx = self.get_worker_index(x, y - 1);
-            let down_next_2 = self.get_other_cell_next(&new_idx, DirectionType::DOWN);
-            if down_next_2.is_some_and(|t| t.get_density() >= cell.get_density()) {
+            let two_below = self.get_cell_next(x, y - 2);
+            if two_below.is_none() || two_below.unwrap().get_density() >= cell.get_density() {
                 self.swap_cells(idx, &new_idx);
                 return true;
             }
@@ -239,43 +245,98 @@ impl<'a> ChunkWorker<'a> {
         false
     }
 
+    fn sideways(&mut self, idx: &WorkerIndex) -> bool {
+        let (x, y) = (idx.x, idx.y);
+        let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
+        let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
+        // get types and make sure they are empty and has not been updated
+        let density = self.chunk.next_cells[idx.idx].get_density();
+        let mut move_left = left.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
+        let mut move_right = right.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
+        if move_left && move_right {
+            // choose 50/50
+            move_left = rand::thread_rng().gen_bool(0.5);
+            move_right = !move_left;
+        }
+
+        if move_left {
+            let other_idx = self.get_worker_index(x - 1, y);
+            self.swap_cells(idx, &other_idx);
+            return true;
+        }
+        else if move_right {
+            let other_idx = self.get_worker_index(x + 1, y);
+            self.swap_cells(idx, &other_idx);
+            return true;
+        }
+        false
+    }
+
     fn add_gravity(&mut self, idx: &WorkerIndex) {
         // check below exists
         if self.get_other_cell_next(idx, DirectionType::DOWN).is_none() {
-            self.chunk.next_cells[idx.idx].velocity.y = 0.;
             return;
         }
+        let max_speed = self.chunk.width as f32;
+
         let below_cell = self.get_other_cell_next(idx, DirectionType::DOWN);
         let below_density = below_cell.unwrap().get_density();
         let below_velocity = below_cell.unwrap().velocity;
 
         let cell = &mut self.chunk.next_cells[idx.idx];
         // Clamp current velocity
-        cell.velocity = cell.velocity.clamp(Vec2::new(-MAX_SPEED, -MAX_SPEED), Vec2::new(MAX_SPEED, MAX_SPEED));
+        cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
 
-        const LIMIT: f32 = 3.;
-        if below_density < cell.get_density() && cell.velocity.y < LIMIT {
-            cell.velocity.y += 0.7;
+        if below_density < cell.get_density() {
+            const LIMIT: f32 = 5.;
+            if cell.velocity.y < LIMIT {
+                cell.velocity.y += 1.;
+            }
         } else {
             if below_velocity.y.abs() < 0.5 {
                 // deflection into x direction
                 if cell.velocity.x == 0. {
                     // 50% chance to go left or right
                     if rand::thread_rng().gen_bool(0.5) {
-                        cell.velocity.x += cell.velocity.y / 5.;
+                        cell.velocity.x += cell.velocity.y / 3.;
                     } else {
-                        cell.velocity.x -= cell.velocity.y / 5.;
+                        cell.velocity.x -= cell.velocity.y / 3.;
                     }
                 } else {
                     if cell.velocity.x < 0. {
-                        cell.velocity.x -= (cell.velocity.y / 5.).abs();
+                        cell.velocity.x -= (cell.velocity.y / 3.).abs();
                     } else {
-                        cell.velocity.x += (cell.velocity.y / 5.).abs();
+                        cell.velocity.x += (cell.velocity.y / 3.).abs();
                     }
                 }
                 // set y velocity to 0
                 cell.velocity.y = 0.;
             }
+        }
+    }
+
+    // Adds some sideways velocity to simulate liquid movement
+    fn add_liquid_movement(&mut self, idx: &WorkerIndex) {
+        let cell = &mut self.chunk.next_cells[idx.idx];
+        let cell_density = cell.get_density();
+
+        let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
+        let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
+        // get types and make sure they are empty and has not been updated
+        let mut move_left = left.is_some_and(|t| t.get_density() < cell_density);
+        let mut move_right = right.is_some_and(|t| t.get_density() < cell_density);
+        if move_left && move_right {
+            // choose 50/50
+            move_left = rand::thread_rng().gen_bool(0.5);
+            move_right = !move_left;
+        }
+
+        let cell = &mut self.chunk.next_cells[idx.idx];
+        if move_left {
+            cell.velocity.x -= 1.;
+        }
+        else if move_right {
+            cell.velocity.x += 1.;
         }
     }
 

@@ -17,8 +17,8 @@ use rayon::prelude::*;
 
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
-const WORLD_SIZE: (i32, i32) = (256, 256);
-const CHUNKS: (i32, i32) = (4, 4);
+const WORLD_SIZE: (i32, i32) = (512, 512);
+const CHUNKS: (i32, i32) = (8, 8);
 const CHUNK_SIZE: (i32, i32) = (WORLD_SIZE.0 / CHUNKS.0, WORLD_SIZE.1 / CHUNKS.1);
 
 fn main() {
