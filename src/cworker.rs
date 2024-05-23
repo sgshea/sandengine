@@ -137,7 +137,9 @@ impl<'a> ChunkWorker<'a> {
             let w = match (x_c, y_c) {
                 (0, 0) => self.chunk.width,
                 (1, 1) => self.chunk.width / 4,
+                (1, -1) => self.chunk.width / 4,
                 (-1, -1) => self.chunk.width / 4,
+                (-1, 1) => self.chunk.width / 4,
                 (1, 0) => self.chunk.width / 2,
                 (-1, 0) => self.chunk.width / 2,
                 _ => self.chunk.width,
