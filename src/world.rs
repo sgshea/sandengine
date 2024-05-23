@@ -158,7 +158,9 @@ fn get_chunk_references<'a>(
                 future_references.insert(*pos, fut);
             },
             (false, false) => {
-                // references.insert(*pos, SplitChunk::from_chunk_corners(chunk));
+                let (cur, fut) = SplitChunk::from_chunk_corners_both(chunk);
+                current_references.insert(*pos, cur);
+                future_references.insert(*pos, fut);
             },
         }
     });
