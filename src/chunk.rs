@@ -154,6 +154,72 @@ fn split_left_right_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Ce
     (cells_l, cells_r)
 }
 
+fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>) {
+    // Get top and bottom
+    let mid = cells.len() / 2;
+    let (top, bottom) = cells.split_at_mut(mid);
+
+    // Get left and right from top
+    let side_length = (top.len() as f64).sqrt() as usize;
+    let half = side_length / 2;
+    let mut cells_tl = Vec::new();
+    let mut cells_tr = Vec::new();
+
+    for i in 0..side_length {
+        let start = i * side_length;
+        let ptr = top.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_tl.push(cell);
+            }
+        }
+    }
+    for i in 0..side_length {
+        let start = i * side_length + half;
+        let ptr = top.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_tr.push(cell);
+            }
+        }
+    }
+
+    // Get left and right from bottom
+    let side_length = (bottom.len() as f64).sqrt() as usize;
+    let half = side_length / 2;
+    let mut cells_bl = Vec::new();
+    let mut cells_br = Vec::new();
+
+    for i in 0..side_length {
+        let start = i * side_length;
+        let ptr = bottom.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_bl.push(cell);
+            }
+        }
+    }
+    for i in 0..side_length {
+        let start = i * side_length + half;
+        let ptr = bottom.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_br.push(cell);
+            }
+        }
+    }
+
+    (cells_tl, cells_tr, cells_bl, cells_br)
+}
+
 pub enum SplitChunk<'a> {
     Entire(&'a mut PixelChunk),
 
@@ -201,5 +267,11 @@ impl SplitChunk<'_> {
         let (left, right) = split_left_right_cells(&mut chunk.cells);
         let (left_next, right_next) = split_left_right_cells(&mut chunk.next_cells);
         (SplitChunk::LeftRight([Some(left), Some(right)]), SplitChunk::LeftRight([Some(left_next), Some(right_next)]))
+    }
+
+    pub fn from_chunk_corners_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
+        let (tl, tr, bl, br) = split_corner_cells(&mut chunk.cells);
+        let (tl_next, tr_next, bl_next, br_next) = split_corner_cells(&mut chunk.next_cells);
+        (SplitChunk::Corners([Some(tl), Some(tr), Some(bl), Some(br)]), SplitChunk::Corners([Some(tl_next), Some(tr_next), Some(bl_next), Some(br_next)]))
     }
 }
