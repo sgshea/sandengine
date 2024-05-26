@@ -52,15 +52,7 @@ impl<'a> ChunkWorker<'a> {
             StateType::SoftSolid(_) => {
                 let idx = self.get_worker_index(x, y);
                 self.add_gravity(&idx);
-                if self.downward_fall(&idx) {
-                    return;
-                }
-                if self.apply_velocity(&idx) {
-                    return;
-                }
-                if self.down_side(&idx) {
-                    return;
-                }
+                self.down_and_side(&idx);
             }
             StateType::Liquid(_) => {
                 let idx = self.get_worker_index(x, y);
@@ -202,6 +194,27 @@ impl<'a> ChunkWorker<'a> {
         }
     }
 
+    // This is a helper function combining downward_Fall, down_side, and apply_velocity
+    fn down_and_side(&mut self, idx: &WorkerIndex) -> bool {
+        let density = self.chunk.next_cells[idx.idx].get_density();
+
+        // Check which of the option in which we can move
+        let can_down = self.get_other_cell_next(idx, DirectionType::DOWN).is_some_and(|t| t.get_density() < density);
+        let can_dleft = self.get_other_cell_next(idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density);
+        let can_dright = self.get_other_cell_next(idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density);
+
+        if can_down && !(can_dleft || can_dright) {
+            // Try downward fall
+            if self.downward_fall(&idx) {
+                return true;
+            } else {
+                return self.apply_velocity(&idx)
+            }
+        } else {
+            return self.down_side(idx)
+        }
+    }
+
     fn downward_fall(&mut self, idx: &WorkerIndex) -> bool {
         let (x, y) = (idx.x, idx.y);
 
@@ -236,13 +249,23 @@ impl<'a> ChunkWorker<'a> {
 
         if move_left {
             let other_idx = self.get_worker_index(x - 1, y - 1);
-            self.swap_cells(idx, &other_idx);
-            return true;
+            // lets also check if it could move futher and we should do velocity
+            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density) && rand::thread_rng().gen_bool(0.9) {
+                return self.apply_velocity(&idx);
+            } else {
+                self.swap_cells(idx, &other_idx);
+                return true;
+            }
         }
         else if move_right {
             let other_idx = self.get_worker_index(x + 1, y - 1);
-            self.swap_cells(idx, &other_idx);
-            return true;
+            // lets also check if it could move futher and we should do velocity
+            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density) && rand::thread_rng().gen_bool(0.9) {
+                return self.apply_velocity(&idx);
+            } else {
+                self.swap_cells(idx, &other_idx);
+                return true;
+            }
         }
         false
     }
