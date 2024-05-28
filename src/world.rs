@@ -2,6 +2,7 @@ use rayon::prelude::*;
 use bevy::utils::hashbrown::HashMap;
 
 use crate::{cell::Cell, chunk::{PixelChunk, SplitChunk}, cworker::ChunkWorker};
+use rand::seq::SliceRandom;
 
 pub struct PixelWorld {
     c_height: i32,
@@ -96,35 +97,40 @@ impl PixelWorld {
     pub fn update(&mut self) {
         let all_pos = self.chunks_lookup.keys().map(|pos| *pos).collect::<Vec<(i32, i32)>>();
 
-        // Iterate in
-        for x in 0..=1 {
-            for y in 0..=1 {
-                let iteration_x_y = (x, y);
-                let chunks = &mut self.chunks_lookup;
-                let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-                let mut future_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-                get_chunk_references(chunks, &mut current_references, &mut future_references, iteration_x_y);
+        // Shuffle iterations each time
+        let mut iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
+        let rng = &mut rand::thread_rng();
+        iterations.shuffle(rng);
 
-                let mut workers: Vec<ChunkWorker> = Vec::new();
-                all_pos.iter().for_each(|pos| {
-                    let x = (pos.0 + iteration_x_y.0) % 2 == 0;
-                    let y = (pos.1 + iteration_x_y.1) % 2 == 0;
-                    if x && y {
-                        // Lifetime explanation:
-                        // we can borrow on each iteration because no references to the hashmap items are kept
-                        // the ChunkWorker removes the center chunk from the hashmap, so we can borrow the hashmap again
-                        // the needed parts of the SplitChunk are also removed from the hashmap using mem::take and similarly not kept in the hashmaps
-                        workers.push(ChunkWorker::new_from_chunk_ref(pos, &mut current_references, &mut future_references, self.iteration % 2 == 0));
-                    }
-                });
-                workers.iter_mut().for_each(|worker| {
-                    worker.update();
-                });
-            }
+        for (x, y) in iterations.iter() {
+            let iteration_x_y = (*x, *y);
+            let chunks = &mut self.chunks_lookup;
+            let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+            let mut future_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+            get_chunk_references(chunks, &mut current_references, &mut future_references, iteration_x_y);
+
+            let mut workers: Vec<ChunkWorker> = Vec::new();
+            all_pos.iter().for_each(|pos| {
+                let x = (pos.0 + iteration_x_y.0) % 2 == 0;
+                let y = (pos.1 + iteration_x_y.1) % 2 == 0;
+                if x && y {
+                    // Lifetime explanation:
+                    // we can borrow on each iteration because no references to the hashmap items are kept
+                    // the ChunkWorker removes the center chunk from the hashmap, so we can borrow the hashmap again
+                    // the needed parts of the SplitChunk are also removed from the hashmap using mem::take and similarly not kept in the hashmaps
+                    workers.push(ChunkWorker::new_from_chunk_ref(pos, &mut current_references, &mut future_references, self.iteration % 2 == 0));
+                }
+            });
+            workers.iter_mut().for_each(|worker| {
+                worker.update();
+            });
         }
         // reset updated_at and swap buffers
         self.chunks_lookup.values_mut().par_bridge().for_each(|chunk| {
-            // swap buffers
+            // swap buffers and reset updated
+            chunk.next_cells.iter_mut().for_each(|cell| {
+                cell.updated = 0;
+            });
             chunk.cells = chunk.next_cells.clone();
         });
         self.iteration += 1;
