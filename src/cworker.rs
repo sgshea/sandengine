@@ -1,4 +1,4 @@
-use std::{cell, mem};
+use std::mem;
 
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 use rand::Rng;
@@ -32,8 +32,14 @@ impl<'a> ChunkWorker<'a> {
 
     pub fn update(&mut self) {
         for y in 0..self.chunk.height {
-            for x in 0..self.chunk.width {
-                self.update_cell(x, y);
+            if self.iter_dir {
+                for x in 0..self.chunk.width {
+                    self.update_cell(x, y);
+                }
+            } else {
+                for x in (0..self.chunk.width).rev() {
+                    self.update_cell(x, y);
+                }
             }
         }
     }
@@ -41,7 +47,8 @@ impl<'a> ChunkWorker<'a> {
     fn update_cell(&mut self, x: i32, y: i32) {
         let state_type = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].get_state_type();
         let new_state = self.chunk.next_cells[get_index(x, y, self.chunk.width as i32)].get_state_type();
-        if state_type != new_state {
+        let updated = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].updated;
+        if state_type != new_state || updated == 1 {
             return;
         }
         match state_type {
@@ -74,7 +81,7 @@ impl<'a> ChunkWorker<'a> {
         }
     }
 
-    fn swap_cells(&mut self, c1: &WorkerIndex, c2: &WorkerIndex) {
+    fn swap_cells(&mut self, c1: &WorkerIndex, c2: &WorkerIndex) -> bool {
         let (x1, y1) = c1.chunk_rel;
 
         // c1 should always be in the center chunk
@@ -82,17 +89,34 @@ impl<'a> ChunkWorker<'a> {
 
         match c2.chunk_rel {
             (0, 0) => {
+                if self.chunk.next_cells[c1.idx].updated == 1 || self.chunk.next_cells[c2.idx].updated == 1 {
+                    return false;
+                }
                 self.chunk.next_cells.swap(c1.idx, c2.idx);
+
+                // mark as updated
+                self.chunk.next_cells[c1.idx].updated = 1;
+                self.chunk.next_cells[c2.idx].updated = 1;
             },
             (x, y) => {
                 // get both current and next of the chunk
                 let next_chunk = self.surrounding_next.get_mut(&(x, y)).unwrap();
 
+                // if the cell has been updated, we cannot swap
+                if self.chunk.next_cells[c1.idx].updated == 1 || next_chunk.as_ref().unwrap()[c2.idx].updated == 1 {
+                    return false;
+                }
+
                 let c1_c = self.chunk.next_cells[c1.idx].clone();
                 self.chunk.next_cells[c1.idx] = next_chunk.as_mut().unwrap()[c2.idx].clone();
                 *next_chunk.as_mut().unwrap()[c2.idx] = c1_c;
+
+                // mark as updated
+                self.chunk.next_cells[c1.idx].updated = 1;
+                next_chunk.as_mut().unwrap()[c2.idx].updated = 1;
             },
         }
+        true
     }
 
     // Gets the index of a relative chunk and index within that chunk
@@ -210,8 +234,14 @@ impl<'a> ChunkWorker<'a> {
             } else {
                 return self.apply_velocity(&idx)
             }
+        } else if can_down && rand::thread_rng().gen_bool(0.8) {
+            if self.downward_fall(idx) {
+                return true;
+            } else {
+                return self.apply_velocity(idx);
+            }
         } else {
-            return self.down_side(idx)
+            return self.down_side(idx);
         }
     }
 
@@ -226,8 +256,7 @@ impl<'a> ChunkWorker<'a> {
             let new_idx = self.get_worker_index(x, y - 1);
             let two_below = self.get_cell_next(x, y - 2);
             if two_below.is_none() || two_below.unwrap().get_density() >= cell.get_density() {
-                self.swap_cells(idx, &new_idx);
-                return true;
+                return self.swap_cells(idx, &new_idx);
             }
         }
         false
@@ -250,21 +279,19 @@ impl<'a> ChunkWorker<'a> {
         if move_left {
             let other_idx = self.get_worker_index(x - 1, y - 1);
             // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density) && rand::thread_rng().gen_bool(0.9) {
-                return self.apply_velocity(&idx);
+            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
+                return self.swap_cells(idx, &other_idx);
             } else {
-                self.swap_cells(idx, &other_idx);
-                return true;
+                return self.apply_velocity(&idx);
             }
         }
         else if move_right {
             let other_idx = self.get_worker_index(x + 1, y - 1);
             // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density) && rand::thread_rng().gen_bool(0.9) {
-                return self.apply_velocity(&idx);
+            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
+                return self.swap_cells(idx, &other_idx);
             } else {
-                self.swap_cells(idx, &other_idx);
-                return true;
+                return self.apply_velocity(&idx);
             }
         }
         false
@@ -286,13 +313,11 @@ impl<'a> ChunkWorker<'a> {
 
         if move_left {
             let other_idx = self.get_worker_index(x - 1, y);
-            self.swap_cells(idx, &other_idx);
-            return true;
+            return self.swap_cells(idx, &other_idx);
         }
         else if move_right {
             let other_idx = self.get_worker_index(x + 1, y);
-            self.swap_cells(idx, &other_idx);
-            return true;
+            return self.swap_cells(idx, &other_idx);
         }
         false
     }
@@ -418,8 +443,7 @@ impl<'a> ChunkWorker<'a> {
                         let cell = &mut self.chunk.next_cells[idx.idx];
                         cell.velocity *= drag;
                         let new_idx = self.get_worker_index(max_x as i32, max_y as i32);
-                        self.swap_cells(idx, &new_idx);
-                        return true;
+                        return self.swap_cells(idx, &new_idx);
                     } else {
                         // stop
                         let cell = &mut self.chunk.next_cells[idx.idx];
@@ -441,8 +465,7 @@ impl<'a> ChunkWorker<'a> {
                     let cell = &mut self.chunk.next_cells[idx.idx];
                     cell.velocity *= drag;
                     let new_idx = self.get_worker_index(max_x as i32, max_y as i32);
-                    self.swap_cells(idx, &new_idx);
-                    return true;
+                    return self.swap_cells(idx, &new_idx);
                 } else {
                     // stop
                     let cell = &mut self.chunk.next_cells[idx.idx];
@@ -495,9 +518,22 @@ pub fn get_surrounding_chunks<'a>(
                             surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
                         }
                     },
-                    SplitChunk::Corners(_) => {
-                        // unimplemented
-                        continue;
+                    SplitChunk::Corners(chunk) => {
+                        match pos_rel {
+                            (1, 1) => {
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[0]));
+                            },
+                            (1, -1) => {
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[3]));
+                            },
+                            (-1, -1) => {
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[2]));
+                            },
+                            (-1, 1) => {
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
+                            },
+                            _ => { continue; },
+                        }
                     },
                 };
             }
