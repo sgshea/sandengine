@@ -122,44 +122,35 @@ impl<'a> ChunkWorker<'a> {
     // Gets the index of a relative chunk and index within that chunk
     fn get_worker_index(&self, x: i32, y: i32) -> WorkerIndex {
         if x >= 0 && x < self.chunk.width && y >= 0 && y < self.chunk.height {
-            return WorkerIndex {
-                chunk_rel: (0, 0),
-                idx: get_index(x, y, self.chunk.width as i32),
-                x,
-                y,
-            };
+        return WorkerIndex {
+            chunk_rel: (0, 0),
+            idx: get_index(x, y, self.chunk.width as i32),
+            x,
+            y,
+        };
         } else {
-            // if self.chunk.pos_y != 0 {
-            //     println!("{} {} ({} {})", x, y, self.chunk.pos_x, self.chunk.pos_y);
-            // }
             // if negative, we are dealing with a chunk to the left or below
             let x_c = if x < 0 { -1 } else if x >= self.chunk.width as i32 { 1 } else { 0 };
             let y_c = if y < 0 { -1 } else if y >= self.chunk.height as i32 { 1 } else { 0 };
-            let (x, y) = (x % self.chunk.width as i32, y % self.chunk.height as i32);
 
-            // Account for different sizes of borrowed chunks
-            let x = match x_c {
-                -1 => (self.chunk.width / 2) + x,
-                1 => x,
-                _ => x,
-            };
-            let y = match y_c {
-                -1 => (self.chunk.height / 2) + y,
-                1 => y,
-                _ => y,
+            let width = self.chunk.width;
+            let width_2 = width / 2;
+            let width_4 = width / 4;
+
+            let (x, y, w) = match (x_c, y_c) {
+                (0, 1) => (x, y % width, width),
+                (0, -1) => (x, (y + width_2), width),
+                (1, 0) => (x % width_2, y, width_2),
+                (-1, 0) => ((x + width_2), y, width_2),
+
+                (-1, 1) => ((x % width_4) * -1, y % width, width_4),
+                (1, 1) => (x % width_4, y % width, width_4),
+                (-1, -1) => ((x % width_4) * -1, (y + width_2), width_4),
+                (1, -1) => (x % width_4, (y + width_2), width_4),
+                _ => panic!("Invalid chunk relative position"),
             };
 
-            // Must have appropriate width depending on the borrowed chunk size
-            let w = match (x_c, y_c) {
-                (0, 0) => self.chunk.width,
-                (1, 1) => self.chunk.width / 4,
-                (1, -1) => self.chunk.width / 4,
-                (-1, -1) => self.chunk.width / 4,
-                (-1, 1) => self.chunk.width / 4,
-                (1, 0) => self.chunk.width / 2,
-                (-1, 0) => self.chunk.width / 2,
-                _ => self.chunk.width,
-            };
+            // println!("{} {} ({}, {})", get_index(x, y, w), get_index(x, y, self.chunk.width as i32), x, y);
 
             // width / 2 because we are only dealing with half chunks
             WorkerIndex {
