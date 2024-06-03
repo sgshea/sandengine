@@ -12,12 +12,12 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUs
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::EguiPlugin;
-use debug_ui::{cell_at_pos_dbg, cell_selector_ui, draw_chunk_gizmos, egui_ui, place_cells_at_pos, update_gizmos_config, ChunkGizmos, DebugInfo, PixelSimulationInteraction};
+use debug_ui::{cell_at_pos_dbg, cell_selector_ui, draw_chunk_gizmos, egui_ui, keyboard_debug, place_cells_at_pos, update_gizmos_config, ChunkGizmos, DebugInfo, PixelSimulationInteraction};
 use rayon::prelude::*;
 
 
 const RESOLUTION: (f32, f32) = (1920.0, 1080.0);
-const WORLD_SIZE: (i32, i32) = (512, 512);
+const WORLD_SIZE: (i32, i32) = (256, 256);
 const CHUNKS: (i32, i32) = (2, 2);
 const CHUNK_SIZE: (i32, i32) = (WORLD_SIZE.0 / CHUNKS.0, WORLD_SIZE.1 / CHUNKS.1);
 
@@ -43,10 +43,12 @@ fn main() {
         .add_systems(FixedUpdate, update_pixel_simulation.run_if(in_state(AppState::Running)))
         .add_systems(PostUpdate, render_pixel_simulation.run_if(in_state(AppState::Running)))
         .add_systems(Update, egui_ui)
+        .add_systems(Update, keyboard_debug)
         .add_systems(Update, cell_selector_ui)
         .add_systems(Update, resize_window)
         .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config))
         .init_state::<AppState>()
+        .insert_resource(Time::<Fixed>::from_hz(64.))
         .run();
 }
 
