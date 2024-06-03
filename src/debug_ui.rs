@@ -125,6 +125,15 @@ pub fn egui_ui(
     );
 }
 
+pub fn keyboard_debug(
+    keys: Res<bevy::input::ButtonInput<KeyCode>>,
+    mut dbg_info: ResMut<DebugInfo>,
+) {
+    if keys.just_pressed(KeyCode::KeyP) {
+        dbg_info.is_paused ^= true;
+    }
+}
+
 pub fn cell_selector_ui(
     mut ctx: EguiContexts,
     mut pixel_interaction: ResMut<PixelSimulationInteraction>,
