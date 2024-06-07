@@ -4,7 +4,7 @@ use bevy_mod_picking::backends::egui::bevy_egui;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{cell::Cell, cell_types::CellType, AppState, PixelSimulation, CHUNK_SIZE, WORLD_SIZE};
+use crate::{cell::Cell, cell_types::CellType, pixel_plugin::PixelSimulation, AppState, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {

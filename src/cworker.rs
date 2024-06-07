@@ -71,9 +71,6 @@ impl<'a> ChunkWorker<'a> {
                 if self.apply_velocity(&idx) {
                     return;
                 }
-                if self.down_side(&idx) {
-                    return;
-                }
             }
             _ => {
                 // do nothing
@@ -374,10 +371,10 @@ impl<'a> ChunkWorker<'a> {
 
         let cell = &mut self.chunk.next_cells[idx.idx];
         if move_left {
-            cell.velocity.x -= 1.;
+            cell.velocity.x -= 1.2;
         }
         else if move_right {
-            cell.velocity.x += 1.;
+            cell.velocity.x += 1.2;
         }
     }
 
