@@ -12,6 +12,7 @@ pub enum CellType {
     Dirt,
     Stone,
     Water,
+    Smoke,
 }
 
 impl CellType {
@@ -23,6 +24,7 @@ impl CellType {
             CellType::Dirt => 60.0,
             CellType::Stone => 100.0,
             CellType::Water => 50.0,
+            CellType::Smoke => 10.0,
         }
     }
 
@@ -34,6 +36,7 @@ impl CellType {
             CellType::Dirt => 0.65,
             CellType::Stone => 0.9,
             CellType::Water => 0.1,
+            CellType::Smoke => 0.1,
         }
     }
 
@@ -73,6 +76,14 @@ impl CellType {
                     150,
                 ]
             },
+            CellType::Smoke => {
+                [
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    150,
+                ]
+            },
         }
     }
 }
@@ -96,6 +107,7 @@ impl From<CellType> for StateType {
             CellType::Dirt => StateType::SoftSolid(ctype),
             CellType::Stone => StateType::HardSolid(ctype),
             CellType::Water => StateType::Liquid(ctype),
+            CellType::Smoke => StateType::Gas(ctype),
         }
     }
 }
