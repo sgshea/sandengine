@@ -64,13 +64,18 @@ impl<'a> ChunkWorker<'a> {
             StateType::Liquid(_) => {
                 let idx = self.get_worker_index(x, y);
                 self.add_gravity(&idx);
-                if self.downward_fall(&idx) {
-                    return;
-                }
                 self.add_liquid_movement(&idx);
                 if self.apply_velocity(&idx) {
                     return;
                 }
+            }
+            StateType::Gas(_) => {
+                let idx = self.get_worker_index(x, y);
+                self.add_upward_force(&idx);
+                if self.apply_velocity(&idx) {
+                    return;
+                }
+                self.sideways(&idx);
             }
             _ => {
                 // do nothing
@@ -332,6 +337,50 @@ impl<'a> ChunkWorker<'a> {
             }
         } else {
             if below_velocity.y.abs() < 0.5 {
+                // deflection into x direction
+                if cell.velocity.x == 0. {
+                    // 50% chance to go left or right
+                    if rand::thread_rng().gen_bool(0.5) {
+                        cell.velocity.x += cell.velocity.y / 3.;
+                    } else {
+                        cell.velocity.x -= cell.velocity.y / 3.;
+                    }
+                } else {
+                    if cell.velocity.x < 0. {
+                        cell.velocity.x -= (cell.velocity.y / 3.).abs();
+                    } else {
+                        cell.velocity.x += (cell.velocity.y / 3.).abs();
+                    }
+                }
+                // set y velocity to 0
+                cell.velocity.y = 0.;
+            }
+        }
+    }
+
+    // Inverse of add_gravity for going upwards (gas movement)
+    fn add_upward_force(&mut self, idx: &WorkerIndex) {
+        // check above exists
+        if self.get_other_cell_next(idx, DirectionType::UP).is_none() {
+            return;
+        }
+        let max_speed = self.chunk.width as f32;
+
+        let above_cell = self.get_other_cell_next(idx, DirectionType::UP);
+        let above_density = above_cell.unwrap().get_density();
+        let above_velocity = above_cell.unwrap().velocity;
+
+        let cell = &mut self.chunk.next_cells[idx.idx];
+        // Clamp current velocity
+        cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
+
+        if above_density < cell.get_density() {
+            const LIMIT: f32 = 5.;
+            if cell.velocity.y > -LIMIT {
+                cell.velocity.y -= 1.;
+            }
+        } else {
+            if above_velocity.y.abs() < 0.5 {
                 // deflection into x direction
                 if cell.velocity.x == 0. {
                     // 50% chance to go left or right

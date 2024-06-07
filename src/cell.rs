@@ -77,6 +77,8 @@ impl From<CellType> for Cell {
                  DirectionType::NONE),
             CellType::Water => Self::new(CellType::Water,
                  DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT),
+            CellType::Smoke => Self::new(CellType::Smoke,
+                    DirectionType::UP | DirectionType::UP_LEFT | DirectionType::UP_RIGHT),
         }
     }
 }
