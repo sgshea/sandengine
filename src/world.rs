@@ -93,6 +93,18 @@ impl PixelWorld {
         }
     }
 
+    pub fn get_total_width(&self) -> i32 {
+        self.c_width * self.chunks_x
+    }
+
+    pub fn get_total_height(&self) -> i32 {
+        self.c_height * self.chunks_y
+    }
+
+    pub fn get_chunks(&self) -> Vec<&PixelChunk> {
+        self.chunks_lookup.values().collect()
+    }
+
     // Update cells
     pub fn update(&mut self) {
         let all_pos = self.chunks_lookup.keys().map(|pos| *pos).collect::<Vec<(i32, i32)>>();
