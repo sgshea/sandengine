@@ -1,9 +1,10 @@
 use std::mem;
 
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
+use bevy_rapier2d::na::ComplexField;
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
+use crate::{cell::{self, Cell}, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
 
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
@@ -58,20 +59,17 @@ impl<'a> ChunkWorker<'a> {
             },
             StateType::SoftSolid(_) => {
                 let idx = self.get_worker_index(x, y);
-                self.add_gravity(&idx);
+                self.apply_gravity(&idx);
                 self.down_and_side(&idx);
             }
             StateType::Liquid(_) => {
                 let idx = self.get_worker_index(x, y);
-                self.add_gravity(&idx);
-                self.add_liquid_movement(&idx);
-                if self.apply_velocity(&idx) {
-                    return;
-                }
+                self.apply_gravity(&idx);
+                self.liquid_movement(&idx);
             }
             StateType::Gas(_) => {
                 let idx = self.get_worker_index(x, y);
-                self.add_upward_force(&idx);
+                self.apply_force(&idx, DirectionType::UP, 1.);
                 if self.apply_velocity(&idx) {
                     return;
                 }
@@ -315,116 +313,135 @@ impl<'a> ChunkWorker<'a> {
         false
     }
 
-    fn add_gravity(&mut self, idx: &WorkerIndex) {
-        // check below exists
-        if self.get_other_cell_next(idx, DirectionType::DOWN).is_none() {
-            return;
-        }
+    // Applies a force in direction with amount
+    fn apply_force(&mut self, source: &WorkerIndex, direction: DirectionType, amount: f32) {
+        // check direction exists
+        let cell_in_direction = match self.get_other_cell_next(source, direction) {
+            Some(cell) => cell.clone(),
+            None => {
+                Cell::new(CellType::Stone, DirectionType::NONE)
+            }
+        };
+        let other_density = cell_in_direction.get_density();
         let max_speed = self.chunk.width as f32;
 
-        let below_cell = self.get_other_cell_next(idx, DirectionType::DOWN);
-        let below_density = below_cell.unwrap().get_density();
-        let below_velocity = below_cell.unwrap().velocity;
-
-        let cell = &mut self.chunk.next_cells[idx.idx];
+        let cell = &mut self.chunk.next_cells[source.idx];
         // Clamp current velocity
         cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
 
-        if below_density < cell.get_density() {
-            const LIMIT: f32 = 5.;
-            if cell.velocity.y < LIMIT {
-                cell.velocity.y += 1.;
+        let cell_density = cell.get_density();
+        if other_density < cell_density {
+            let limit = 5.;
+            match direction {
+                DirectionType::LEFT => {
+                    if cell.velocity.x > -limit {
+                        cell.velocity.x -= amount;
+                    }
+                },
+                DirectionType::RIGHT => {
+                    if cell.velocity.x < limit {
+                        cell.velocity.x += amount;
+                    }
+                },
+                DirectionType::UP => {
+                    if cell.velocity.y < limit {
+                        cell.velocity.y -= amount;
+                    }
+                },
+                DirectionType::DOWN => {
+                    if cell.velocity.y < limit {
+                        cell.velocity.y += amount;
+                    }
+                },
+                _ => {},
             }
         } else {
-            if below_velocity.y.abs() < 0.5 {
-                // deflection into x direction
-                if cell.velocity.x == 0. {
-                    // 50% chance to go left or right
-                    if rand::thread_rng().gen_bool(0.5) {
-                        cell.velocity.x += cell.velocity.y / 3.;
-                    } else {
-                        cell.velocity.x -= cell.velocity.y / 3.;
+            // deflection into adjacent direction when hitting a wall or hitting ground
+            let other_velocity = cell_in_direction.velocity;
+            match direction {
+                // hitting wall (left or right)
+                DirectionType::LEFT | DirectionType::RIGHT => {
+                    if other_velocity.x.abs() < 0.5 {
+                        // deflection into y direction based on cell movement type
+                        if cell.get_movement().contains(DirectionType::DOWN) {
+                            cell.velocity.y -= cell.velocity.x / 3.;
+                        } else if cell.get_movement().contains(DirectionType::UP) {
+                            cell.velocity.y += cell.velocity.x / 3.;
+                        }
+                        cell.velocity.x = 0.;
                     }
-                } else {
-                    if cell.velocity.x < 0. {
-                        cell.velocity.x -= (cell.velocity.y / 3.).abs();
-                    } else {
-                        cell.velocity.x += (cell.velocity.y / 3.).abs();
+                },
+                // hitting ground or ceiling
+                DirectionType::DOWN | DirectionType::UP => {
+                    if other_velocity.y.abs() < 0.5 {
+                        // deflection into x direction
+                        if cell.velocity.x == 0. {
+                            // 50% chance to go left or right
+                            if rand::thread_rng().gen_bool(0.5) {
+                                cell.velocity.x += cell.velocity.y / 3.;
+                            } else {
+                                cell.velocity.x -= cell.velocity.y / 3.;
+                            }
+                        } else {
+                            if cell.velocity.x < 0. {
+                                cell.velocity.x -= (cell.velocity.y / 3.).abs();
+                            } else {
+                                cell.velocity.x += (cell.velocity.y / 3.).abs();
+                            }
+                        }
+                        cell.velocity.y = 0.;
                     }
-                }
-                // set y velocity to 0
-                cell.velocity.y = 0.;
+                },
+                _ => {},
             }
         }
     }
 
-    // Inverse of add_gravity for going upwards (gas movement)
-    fn add_upward_force(&mut self, idx: &WorkerIndex) {
-        // check above exists
-        if self.get_other_cell_next(idx, DirectionType::UP).is_none() {
-            return;
-        }
-        let max_speed = self.chunk.width as f32;
-
-        let above_cell = self.get_other_cell_next(idx, DirectionType::UP);
-        let above_density = above_cell.unwrap().get_density();
-        let above_velocity = above_cell.unwrap().velocity;
-
-        let cell = &mut self.chunk.next_cells[idx.idx];
-        // Clamp current velocity
-        cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
-
-        if above_density < cell.get_density() {
-            const LIMIT: f32 = 5.;
-            if cell.velocity.y > -LIMIT {
-                cell.velocity.y -= 1.;
-            }
-        } else {
-            if above_velocity.y.abs() < 0.5 {
-                // deflection into x direction
-                if cell.velocity.x == 0. {
-                    // 50% chance to go left or right
-                    if rand::thread_rng().gen_bool(0.5) {
-                        cell.velocity.x += cell.velocity.y / 3.;
-                    } else {
-                        cell.velocity.x -= cell.velocity.y / 3.;
-                    }
-                } else {
-                    if cell.velocity.x < 0. {
-                        cell.velocity.x -= (cell.velocity.y / 3.).abs();
-                    } else {
-                        cell.velocity.x += (cell.velocity.y / 3.).abs();
-                    }
-                }
-                // set y velocity to 0
-                cell.velocity.y = 0.;
-            }
-        }
+    // Applies gravity to the cell
+    // Shortcuts to apply_force
+    fn apply_gravity(&mut self, idx: &WorkerIndex) {
+        self.apply_force(idx, DirectionType::DOWN, 1.);
     }
 
     // Adds some sideways velocity to simulate liquid movement
-    fn add_liquid_movement(&mut self, idx: &WorkerIndex) {
-        let cell = &mut self.chunk.next_cells[idx.idx];
+    fn liquid_movement(&mut self, idx: &WorkerIndex) {
+        let cell = &self.chunk.next_cells[idx.idx];
+        let down_density = self.get_other_cell_next(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(100.);
         let cell_density = cell.get_density();
+        if down_density >= cell_density && cell.velocity.x.abs() <= 7. {
+            let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
+            let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
+            // get types and make sure they are empty and has not been updated
+            let mut move_left = cell.velocity.x < 0.;
+            let mut move_right = cell.velocity.x > 0.;
+            if !move_left && !move_right {
+                // operate on density
+                move_left = left.is_some_and(|t| t.get_density() < cell_density);
+                move_right = right.is_some_and(|t| t.get_density() < cell_density);
 
-        let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
-        let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
-        // get types and make sure they are empty and has not been updated
-        let mut move_left = left.is_some_and(|t| t.get_density() < cell_density);
-        let mut move_right = right.is_some_and(|t| t.get_density() < cell_density);
-        if move_left && move_right {
-            // choose 50/50
-            move_left = rand::thread_rng().gen_bool(0.5);
-            move_right = !move_left;
-        }
+                if move_left && move_right {
+                    // choose 50/50
+                    move_left = rand::thread_rng().gen_bool(0.5);
+                    move_right = !move_left;
+                }
+            }
 
-        let cell = &mut self.chunk.next_cells[idx.idx];
-        if move_left {
-            cell.velocity.x -= 1.2;
+            let acceleration = 0.4;
+            let cell = &mut self.chunk.next_cells[idx.idx];
+            if move_right {
+                if cell.velocity.x < 0. {
+                    cell.velocity.x = 0.;
+                }
+                cell.velocity.x += acceleration;
+            } else if move_left {
+                if cell.velocity.x > 0. {
+                    cell.velocity.x = 0.;
+                }
+                cell.velocity.x -= acceleration;
+            }
+
         }
-        else if move_right {
-            cell.velocity.x += 1.2;
-        }
+        self.apply_velocity(&idx);
     }
 
     fn apply_velocity(&mut self, idx: &WorkerIndex) -> bool {
@@ -459,7 +476,7 @@ impl<'a> ChunkWorker<'a> {
         // Moving elements to furthest position possible
         let (mut max_x, mut max_y) = (idx.x as f32, idx.y as f32);
         let (x, y) = (idx.x as f32, idx.y as f32);
-        let drag = 0.9;
+        let mut drag = 1.0;
         for i in 1..=vector_length.round() as i32 {
             // calculate index
             let (x, y) = ((x as f32 - (f_x * i as f32)).round() as i32, (y as f32 - (f_y * i as f32)).round() as i32);
@@ -469,7 +486,7 @@ impl<'a> ChunkWorker<'a> {
 
             // cell is none or solid, cannot move futher
             if other_cell.is_none() || matches!(other_cell.unwrap().get_state_type(), StateType::HardSolid(_)) {
-                if i == 1 || other_cell.is_none() {
+                if i == 1 {
                     // immediately stoped
                     let cell = &mut self.chunk.next_cells[idx.idx];
                     cell.velocity = Vec2::ZERO;
@@ -491,6 +508,7 @@ impl<'a> ChunkWorker<'a> {
             } else {
                 if other_cell.unwrap().get_density() < cell_density {
                     // new furthest position
+                    drag = 0.9;
                     (max_x, max_y) = (x as f32, y as f32);
                 }
             }
