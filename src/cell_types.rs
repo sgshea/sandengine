@@ -35,8 +35,8 @@ impl CellType {
             CellType::Sand => 0.5,
             CellType::Dirt => 0.65,
             CellType::Stone => 0.9,
-            CellType::Water => 0.1,
-            CellType::Smoke => 0.1,
+            CellType::Water => 0.4,
+            CellType::Smoke => 0.2,
         }
     }
 

@@ -1,7 +1,6 @@
 use std::mem;
 
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
-use bevy_rapier2d::na::ComplexField;
 use rand::Rng;
 
 use crate::{cell::{self, Cell}, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
@@ -62,10 +61,20 @@ impl<'a> ChunkWorker<'a> {
                 self.apply_gravity(&idx);
                 self.down_and_side(&idx);
             }
-            StateType::Liquid(_) => {
+            StateType::Liquid(cell_type) => {
                 let idx = self.get_worker_index(x, y);
                 self.apply_gravity(&idx);
-                self.liquid_movement(&idx);
+                self.downward_fall(&idx);
+                // liquid movement (don't do every frame)
+                if rand::thread_rng().gen_bool(cell_type.cell_inertia() as f64) {
+                    self.liquid_movement(&idx);
+                }
+                if self.apply_velocity(&idx) {
+                    return;
+                }
+                if self.sideways(&idx) {
+                    return;
+                }
             }
             StateType::Gas(_) => {
                 let idx = self.get_worker_index(x, y);
@@ -73,7 +82,9 @@ impl<'a> ChunkWorker<'a> {
                 if self.apply_velocity(&idx) {
                     return;
                 }
-                self.sideways(&idx);
+                if self.sideways(&idx) {
+                    return;
+                }
             }
             _ => {
                 // do nothing
@@ -95,7 +106,6 @@ impl<'a> ChunkWorker<'a> {
                 self.chunk.next_cells.swap(c1.idx, c2.idx);
 
                 // mark as updated
-                self.chunk.next_cells[c1.idx].updated = 1;
                 self.chunk.next_cells[c2.idx].updated = 1;
             },
             (x, y) => {
@@ -112,7 +122,6 @@ impl<'a> ChunkWorker<'a> {
                 *next_chunk.as_mut().unwrap()[c2.idx] = c1_c;
 
                 // mark as updated
-                self.chunk.next_cells[c1.idx].updated = 1;
                 next_chunk.as_mut().unwrap()[c2.idx].updated = 1;
             },
         }
@@ -406,7 +415,7 @@ impl<'a> ChunkWorker<'a> {
     // Adds some sideways velocity to simulate liquid movement
     fn liquid_movement(&mut self, idx: &WorkerIndex) {
         let cell = &self.chunk.next_cells[idx.idx];
-        let down_density = self.get_other_cell_next(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(100.);
+        let down_density = self.get_other_cell_next(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(1000.);
         let cell_density = cell.get_density();
         if down_density >= cell_density && cell.velocity.x.abs() <= 7. {
             let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
@@ -439,9 +448,7 @@ impl<'a> ChunkWorker<'a> {
                 }
                 cell.velocity.x -= acceleration;
             }
-
         }
-        self.apply_velocity(&idx);
     }
 
     fn apply_velocity(&mut self, idx: &WorkerIndex) -> bool {
@@ -486,7 +493,7 @@ impl<'a> ChunkWorker<'a> {
 
             // cell is none or solid, cannot move futher
             if other_cell.is_none() || matches!(other_cell.unwrap().get_state_type(), StateType::HardSolid(_)) {
-                if i == 1 {
+                if i == 1 || other_cell.is_none() {
                     // immediately stoped
                     let cell = &mut self.chunk.next_cells[idx.idx];
                     cell.velocity = Vec2::ZERO;
@@ -508,7 +515,7 @@ impl<'a> ChunkWorker<'a> {
             } else {
                 if other_cell.unwrap().get_density() < cell_density {
                     // new furthest position
-                    drag = 0.9;
+                    drag = 0.7;
                     (max_x, max_y) = (x as f32, y as f32);
                 }
             }
