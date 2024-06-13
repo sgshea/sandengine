@@ -80,6 +80,9 @@ impl PixelWorld {
     }
 
     pub fn get_cell(&self, x: i32, y: i32) -> Option<&Cell> {
+        if x < 0 || y < 0 || x >= self.get_total_width() || y >= self.get_total_height() {
+            return None;
+        }
         match self.chunks_lookup.get(&self.get_chunk_location(x, y)) {
             Some(chunk) => Some(chunk.get_cell_2d(x, y)),
             None => None,
