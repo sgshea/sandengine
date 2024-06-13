@@ -15,6 +15,12 @@ pub enum CellType {
     Smoke,
 }
 
+impl Default for CellType {
+    fn default() -> Self {
+        CellType::Empty
+    }
+}
+
 impl CellType {
     // Density is how likely a cell is to move through liquids
     pub fn cell_density(&self) -> f32 {
@@ -90,13 +96,19 @@ impl CellType {
 
 // What kind of cell state is it?
 // Used to determine simple behaviors, but allows access to a more specific CellType
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
 pub enum StateType {
     Empty(CellType),
     SoftSolid(CellType), // Soft solid, like sand that can move
     HardSolid(CellType), // Hard solid, like stone that can't move
     Liquid(CellType),
     Gas(CellType),
+}
+
+impl Default for StateType {
+    fn default() -> Self {
+        StateType::Empty(CellType::Empty)
+    }
 }
 
 impl From<CellType> for StateType {

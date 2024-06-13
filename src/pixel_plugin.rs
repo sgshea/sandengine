@@ -4,16 +4,21 @@ use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUs
 use bevy_mod_picking::prelude::*;
 use rayon::prelude::*;
 
-use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
+use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
 
 pub struct PixelPlugin;
 impl Plugin for PixelPlugin {
     fn build(&self, app: &mut App) {
         app
             .init_resource::<PixelSimulationInteraction>()
+            .add_plugins(SandEngineRigidPlugin)
             .add_systems(Startup, setup_pixel_simulation)
-            .add_systems(FixedUpdate, update_pixel_simulation.run_if(in_state(AppState::Running)))
-            .add_systems(PostUpdate, render_pixel_simulation.run_if(in_state(AppState::Running)))
+            .add_systems(
+                FixedUpdate,
+                (update_pixel_simulation, render_pixel_simulation)
+                .chain()
+                .distributive_run_if(in_state(AppState::Running)),
+            )
             .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
 
     }
@@ -122,7 +127,7 @@ fn update_pixel_simulation(
     mut dbg_info: ResMut<DebugInfo>,
 ) {
     let start = time::Instant::now();
-    query.iter_mut().next().unwrap().world.update();
+    query.single_mut().world.update();
     let elapsed = start.elapsed().as_secs_f32();
     dbg_info.sim_time.push(elapsed);
     if dbg_info.sim_time.len() > 100 {
