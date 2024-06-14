@@ -1,4 +1,4 @@
-use std::mem;
+use std::{fmt::Debug, mem};
 
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 use rand::Rng;
@@ -146,25 +146,24 @@ impl<'a> ChunkWorker<'a> {
             let width_2 = width / 2;
             let width_4 = width / 4;
 
-            let (x, y, w) = match (x_c, y_c) {
+            let (n_x, n_y, w) = match (x_c, y_c) {
                 (0, 1) => (x, y % width, width),
                 (0, -1) => (x, (y + width_2), width),
                 (1, 0) => (x % width_2, y, width_2),
                 (-1, 0) => ((x + width_2), y, width_2),
 
-                (-1, 1) => ((x % width_4) * -1, y % width, width_4),
+                (-1, 1) => ((x % width_4) + width_2, y % width, width_4),
                 (1, 1) => (x % width_4, y % width, width_4),
-                (-1, -1) => ((x % width_4) * -1, (y + width_2), width_4),
-                (1, -1) => (x % width_4, (y + width_2), width_4),
+                (-1, -1) => ((x % width_4) + width_2, (y + width_2), width_2),
+                (1, -1) => (x % width_4, (y + width_2), width_2),
                 _ => panic!("Invalid chunk relative position"),
             };
 
             // println!("{} {} ({}, {})", get_index(x, y, w), get_index(x, y, self.chunk.width as i32), x, y);
 
-            // width / 2 because we are only dealing with half chunks
             WorkerIndex {
                 chunk_rel: (x_c, y_c),
-                idx: get_index(x, y, w),
+                idx: get_index(n_x, n_y, w),
                 x,
                 y,
             }
@@ -207,8 +206,9 @@ impl<'a> ChunkWorker<'a> {
                         match chunk {
                             None => None,
                             Some(chunk) => {
-                                // let cell = &chunk[other_idx.idx];
-                                // println!("{} {} ({}, {}), ({:?})", idx.idx, other_idx.idx, other_idx.x, other_idx.y, cell.get_type());
+                                // println!("{} {} ({}, {})", idx.idx, other_idx.idx, other_idx.x, other_idx.y);
+                                // chunk sizes
+                                // println!("{} {}", chunk.len(), chunk.len());
                                 Some(&chunk[other_idx.idx])
                             }
                         }
@@ -549,6 +549,12 @@ struct WorkerIndex {
     y: i32,
 }
 
+impl Debug for WorkerIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WorkerIndex {{ chunk_rel: {:?}, idx: {}, x: {}, y: {} }}", self.chunk_rel, self.idx, self.x, self.y)
+    }
+}
+
 fn get_index(x: i32, y: i32, width: i32) -> usize {
     (y * width + x) as usize
 }
@@ -583,7 +589,7 @@ pub fn get_surrounding_chunks<'a>(
                     SplitChunk::Corners(chunk) => {
                         match pos_rel {
                             (1, 1) => {
-                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[0]));
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
                             },
                             (1, -1) => {
                                 surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[3]));
@@ -592,7 +598,7 @@ pub fn get_surrounding_chunks<'a>(
                                 surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[2]));
                             },
                             (-1, 1) => {
-                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[0]));
                             },
                             _ => { continue; },
                         }
@@ -603,4 +609,73 @@ pub fn get_surrounding_chunks<'a>(
     }
 
     surrounding_chunks
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::world::{get_chunk_references, PixelWorld};
+
+    use super::*;
+
+    // Test getting indices in surrounding chunks math
+    // Representation:
+    // 240	241	242	243	244	245	246	247	248	249	250	251	252	253	254	255
+    // 224	225	226	227	228	229	230	231	232	233	234	235	236	237	238	239
+    // 208	209	210	211	212	213	214	215	216	217	218	219	220	221	222	223
+    // 192	193	194	195	196	197	198	199	200	201	202	203	204	205	206	207
+    // 176	177	178	179	180	181	182	183	184	185	186	187	188	189	190	191
+    // 160	161	162	163	164	165	166	167	168	169	170	171	172	173	174	175
+    // 144	145	146	147	148	149	150	151	152	153	154	155	156	157	158	159
+    // 128	129	130	131	132	133	134	135	136	137	138	139	140	141	142	143
+    // 112	113	114	115	116	117	118	119	120	121	122	123	124	125	126	127
+    // 96	97	98	99	100	101	102	103	104	105	106	107	108	109	110	111
+    // 80	81	82	83	84	85	86	87	88	89	90	91	92	93	94	95
+    // 64	65	66	67	68	69	70	71	72	73	74	75	76	77	78	79
+    // 48	49	50	51	52	53	54	55	56	57	58	59	60	61	62	63
+    // 32	33	34	35	36	37	38	39	40	41	42	43	44	45	46	47
+    // 16	17	18	19	20	21	22	23	24	25	26	27	28	29	30	31
+    // 0	1	2	3	4	5	6	7	8	9	10	11	12	13	14	15
+    // A single corner would be:
+    // 56	57	58	59	60	61	62	63
+    // 48	49	50	51	52	53	54	55
+    // 40	41	42	43	44	45	46	47
+    // 32	33	34	35	36	37	38	39
+    // 24	25	26	27	28	29	30	31
+    // 16	17	18	19	20	21	22	23
+    // 8	9	10	11	12	13	14	15
+    // 0	1	2	3	4	5	6	7
+    #[test]
+    fn test_surrounding_chunks_worker_indices() {
+        // Create test world
+        // Each chunk is 16x16
+        let mut world = PixelWorld::new(64, 64, 4, 4);
+
+        let chunks = &mut world.chunks_lookup;
+        let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+        let mut future_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
+        get_chunk_references(chunks, &mut current_references, &mut future_references, (1, 1));
+
+        let test_worker = ChunkWorker::new_from_chunk_ref(&(1, 1), &mut current_references, &mut future_references, true);
+
+        assert_eq!(test_worker.chunk.get_pos(), (1, 1));
+        // Bottom left corner chunk
+        let pos_1= test_worker.get_worker_index(-1, -1);
+        assert_eq!(pos_1.chunk_rel, (-1, -1));
+        assert_eq!(pos_1.idx, 63);
+
+        // Bottom right corner chunk
+        let pos_2 = test_worker.get_worker_index(16, -1);
+        assert_eq!(pos_2.chunk_rel, (1, -1));
+        assert_eq!(pos_2.idx, 56);
+
+        // Top left corner chunk
+        let pos_3 = test_worker.get_worker_index(-1, 16);
+        assert_eq!(pos_3.chunk_rel, (-1, 1));
+        assert_eq!(pos_3.idx, 7);
+
+        // Top right corner chunk
+        let pos_4 = test_worker.get_worker_index(16, 16);
+        assert_eq!(pos_4.chunk_rel, (1, 1));
+        assert_eq!(pos_4.idx, 0);
+    }
 }
