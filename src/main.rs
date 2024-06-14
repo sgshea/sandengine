@@ -13,7 +13,6 @@ use bevy::{prelude::*, window::{PresentMode, WindowResized}};
 use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
 // bevy_egui re-exported from bevy_mod_picking
 use bevy_egui::EguiPlugin;
-use bevy_rapier2d::{plugin::{NoUserData, RapierPhysicsPlugin}, render::RapierDebugRenderPlugin};
 use debug_ui::{cell_selector_ui, egui_ui, keyboard_debug, ChunkGizmos, DebugInfo};
 use pixel_plugin::PixelPlugin;
 
@@ -39,8 +38,6 @@ fn main() {
         .init_resource::<DebugInfo>()
         .init_resource::<WindowInformation>()
         .init_gizmo_group::<ChunkGizmos>()
-        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.))
-        .add_plugins(RapierDebugRenderPlugin::default())
         .add_systems(Update, egui_ui)
         .add_systems(Update, keyboard_debug)
         .add_systems(Update, cell_selector_ui)
