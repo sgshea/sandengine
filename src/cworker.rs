@@ -589,16 +589,16 @@ pub fn get_surrounding_chunks<'a>(
                     SplitChunk::Corners(chunk) => {
                         match pos_rel {
                             (1, 1) => {
-                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[0]));
                             },
                             (1, -1) => {
-                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[3]));
-                            },
-                            (-1, -1) => {
                                 surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[2]));
                             },
+                            (-1, -1) => {
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[3]));
+                            },
                             (-1, 1) => {
-                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[0]));
+                                surrounding_chunks.insert(pos_rel, mem::take(&mut chunk[1]));
                             },
                             _ => { continue; },
                         }
