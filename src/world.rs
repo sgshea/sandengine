@@ -11,7 +11,7 @@ pub struct PixelWorld {
     chunks_x: i32,
     chunks_y: i32,
 
-    chunks_lookup: HashMap<(i32, i32), PixelChunk>,
+    pub chunks_lookup: HashMap<(i32, i32), PixelChunk>,
 
     iteration: u32,
 }
@@ -153,7 +153,7 @@ impl PixelWorld {
 }
 
 // Turns all chunks into split chunks
-fn get_chunk_references<'a>(
+pub(crate) fn get_chunk_references<'a>(
     chunks: &'a mut HashMap<(i32, i32), PixelChunk>,
     current_references: &mut HashMap<(i32, i32), SplitChunk<'a>>,
     future_references: &mut HashMap<(i32, i32), SplitChunk<'a>>,

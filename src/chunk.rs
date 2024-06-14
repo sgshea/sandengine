@@ -155,17 +155,17 @@ fn split_left_right_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Ce
 }
 
 fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>) {
+    let side_length = (cells.len() as f64).sqrt() as usize;
     // Get top and bottom
     let mid = cells.len() / 2;
     let (top, bottom) = cells.split_at_mut(mid);
 
     // Get left and right from top
-    let side_length = (top.len() as f64).sqrt() as usize;
     let half = side_length / 2;
     let mut cells_tl = Vec::new();
     let mut cells_tr = Vec::new();
 
-    for i in 0..side_length {
+    for i in 0..half {
         let start = i * side_length;
         let ptr = top.as_mut_ptr();
 
@@ -176,7 +176,7 @@ fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>,
             }
         }
     }
-    for i in 0..side_length {
+    for i in 0..half {
         let start = i * side_length + half;
         let ptr = top.as_mut_ptr();
 
@@ -189,12 +189,10 @@ fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>,
     }
 
     // Get left and right from bottom
-    let side_length = (bottom.len() as f64).sqrt() as usize;
-    let half = side_length / 2;
     let mut cells_bl = Vec::new();
     let mut cells_br = Vec::new();
 
-    for i in 0..side_length {
+    for i in 0..half {
         let start = i * side_length;
         let ptr = bottom.as_mut_ptr();
 
@@ -205,7 +203,7 @@ fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>,
             }
         }
     }
-    for i in 0..side_length {
+    for i in 0..half {
         let start = i * side_length + half;
         let ptr = bottom.as_mut_ptr();
 
@@ -273,5 +271,41 @@ impl SplitChunk<'_> {
         let (tl, tr, bl, br) = split_corner_cells(&mut chunk.cells);
         let (tl_next, tr_next, bl_next, br_next) = split_corner_cells(&mut chunk.next_cells);
         (SplitChunk::Corners([Some(tl), Some(tr), Some(bl), Some(br)]), SplitChunk::Corners([Some(tl_next), Some(tr_next), Some(bl_next), Some(br_next)]))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_top_bottom_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
+        assert_eq!(top.len(), 128);
+        assert_eq!(bottom.len(), 128);
+    }
+
+    #[test]
+    fn test_split_left_right_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (left, right) = split_left_right_cells(&mut chunk.cells);
+        assert_eq!(left.len(), 128);
+        assert_eq!(right.len(), 128);
+    }
+
+    #[test]
+    fn test_split_corner_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (top_left, top_right, bottom_left, bottom_right) = split_corner_cells(&mut chunk.cells);
+        // each should be 8x8
+
+        assert_eq!(top_left.len(), 64);
+        assert_eq!(top_right.len(), 64);
+        assert_eq!(bottom_left.len(), 64);
+        assert_eq!(bottom_right.len(), 64);
     }
 }
