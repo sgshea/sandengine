@@ -3,7 +3,7 @@ use std::mem;
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 use rand::Rng;
 
-use crate::{cell::{self, Cell}, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
+use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
 
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
