@@ -104,6 +104,14 @@ impl PixelWorld {
         self.c_height * self.chunks_y
     }
 
+    pub fn get_chunk_width(&self) -> i32 {
+        self.c_width
+    }
+
+    pub fn get_chunk_height(&self) -> i32 {
+        self.c_height
+    }
+
     pub fn get_chunks(&self) -> Vec<&PixelChunk> {
         self.chunks_lookup.values().collect()
     }
