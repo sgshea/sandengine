@@ -9,8 +9,6 @@ pub struct PixelChunk {
     pub pos_y: i32,
 
     pub cells: Vec<Cell>,
-    // Secondary buffer for next iteration
-    pub next_cells: Vec<Cell>,
 
     pub awake: bool,
     pub awake_next: bool,
@@ -26,7 +24,6 @@ impl PixelChunk {
             pos_x,
             pos_y,
             cells,
-            next_cells: vec![Cell::empty(); (height * width) as usize],
             awake: true,
             awake_next: true,
         };
@@ -90,7 +87,7 @@ impl PixelChunk {
 
     pub fn set_cell_1d(&mut self, idx: usize, cell: Cell) {
         if idx < self.cells.len() {
-            self.next_cells[idx] = cell;
+            self.cells[idx] = cell;
             self.awake_next = true;
         }
     }
@@ -247,43 +244,19 @@ impl SplitChunk<'_> {
         SplitChunk::Entire(chunk)
     }
 
-    fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
+    pub fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
         let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
         SplitChunk::TopBottom([Some(top), Some(bottom)])
     }
 
-    fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
+    pub fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
         let (left, right) = split_left_right_cells(&mut chunk.cells);
         SplitChunk::LeftRight([Some(left), Some(right)])
     }
-    // Borrowing future cells from the chunk
-    fn from_chunk_vert_next(chunk: &mut PixelChunk) -> SplitChunk {
-        let (top, bottom) = split_top_bottom_cells(&mut chunk.next_cells);
-        SplitChunk::TopBottom([Some(top), Some(bottom)])
-    }
 
-    fn from_chunk_side_next(chunk: &mut PixelChunk) -> SplitChunk {
-        let (left, right) = split_left_right_cells(&mut chunk.next_cells);
-        SplitChunk::LeftRight([Some(left), Some(right)])
-    }
-
-    // Borrowing both current and future cells from the chunk
-    pub fn from_chunk_vert_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
-        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
-        let (top_next, bottom_next) = split_top_bottom_cells(&mut chunk.next_cells);
-        (SplitChunk::TopBottom([Some(top), Some(bottom)]), SplitChunk::TopBottom([Some(top_next), Some(bottom_next)]))
-    }
-
-    pub fn from_chunk_side_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
-        let (left, right) = split_left_right_cells(&mut chunk.cells);
-        let (left_next, right_next) = split_left_right_cells(&mut chunk.next_cells);
-        (SplitChunk::LeftRight([Some(left), Some(right)]), SplitChunk::LeftRight([Some(left_next), Some(right_next)]))
-    }
-
-    pub fn from_chunk_corners_both(chunk: &mut PixelChunk) -> (SplitChunk, SplitChunk) {
+    pub fn from_chunk_corners(chunk: &mut PixelChunk) -> SplitChunk {
         let (tl, tr, bl, br) = split_corner_cells(&mut chunk.cells);
-        let (tl_next, tr_next, bl_next, br_next) = split_corner_cells(&mut chunk.next_cells);
-        (SplitChunk::Corners([Some(tl), Some(tr), Some(bl), Some(br)]), SplitChunk::Corners([Some(tl_next), Some(tr_next), Some(bl_next), Some(br_next)]))
+        SplitChunk::Corners([Some(tl), Some(tr), Some(bl), Some(br)])
     }
 }
 
