@@ -7,25 +7,22 @@ use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk:
 
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
-    surrounding_current: HashMap<(i32, i32), Option<Vec<&'a mut Cell>>>,
-    surrounding_next: HashMap<(i32, i32), Option<Vec<&'a mut Cell>>>,
+    surrounding: HashMap<(i32, i32), Option<Vec<&'a mut Cell>>>,
     iter_dir: bool,
 }
 
 impl<'a> ChunkWorker<'a> {
-    pub fn new_from_chunk_ref(pos: &(i32, i32), current: &mut HashMap<(i32, i32), SplitChunk<'a>>, next: &mut HashMap<(i32, i32), SplitChunk<'a>>, iter_dir: bool) -> Self {
+    pub fn new_from_chunk_ref(pos: &(i32, i32), current: &mut HashMap<(i32, i32), SplitChunk<'a>>, iter_dir: bool) -> Self {
         // get center
         let chunk = match current.remove(pos).unwrap() {
             SplitChunk::Entire(chunk) => chunk,
             _ => panic!("Expected entire chunk for center"),
         };
-        let surrounding_current = get_surrounding_chunks(current, pos.0, pos.1);
-        let surrounding_next = get_surrounding_chunks(next, pos.0, pos.1);
+        let surrounding= get_surrounding_chunks(current, pos.0, pos.1);
 
         Self {
             chunk,
-            surrounding_current,
-            surrounding_next,
+            surrounding,
             iter_dir,
         }
     }
@@ -46,9 +43,8 @@ impl<'a> ChunkWorker<'a> {
 
     fn update_cell(&mut self, x: i32, y: i32) {
         let state_type = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].get_state_type();
-        let new_state = self.chunk.next_cells[get_index(x, y, self.chunk.width as i32)].get_state_type();
         let updated = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].updated;
-        if state_type != new_state || updated == 1 {
+        if updated == 1 {
             return;
         }
         match state_type {
@@ -100,29 +96,29 @@ impl<'a> ChunkWorker<'a> {
 
         match c2.chunk_rel {
             (0, 0) => {
-                if self.chunk.next_cells[c1.idx].updated == 1 || self.chunk.next_cells[c2.idx].updated == 1 {
+                if self.chunk.cells[c1.idx].updated == 1 || self.chunk.cells[c2.idx].updated == 1 {
                     return false;
                 }
-                self.chunk.next_cells.swap(c1.idx, c2.idx);
+                self.chunk.cells.swap(c1.idx, c2.idx);
 
                 // mark as updated
-                self.chunk.next_cells[c2.idx].updated = 1;
+                self.chunk.cells[c2.idx].updated = 1;
             },
             (x, y) => {
                 // get both current and next of the chunk
-                let next_chunk = self.surrounding_next.get_mut(&(x, y)).unwrap();
+                let chunk = self.surrounding.get_mut(&(x, y)).unwrap();
 
                 // if the cell has been updated, we cannot swap
-                if self.chunk.next_cells[c1.idx].updated == 1 || next_chunk.as_ref().unwrap()[c2.idx].updated == 1 {
+                if self.chunk.cells[c1.idx].updated == 1 || chunk.as_ref().unwrap()[c2.idx].updated == 1 {
                     return false;
                 }
 
-                let c1_c = self.chunk.next_cells[c1.idx].clone();
-                self.chunk.next_cells[c1.idx] = next_chunk.as_mut().unwrap()[c2.idx].clone();
-                *next_chunk.as_mut().unwrap()[c2.idx] = c1_c;
+                let c1_c = self.chunk.cells[c1.idx].clone();
+                self.chunk.cells[c1.idx] = chunk.as_mut().unwrap()[c2.idx].clone();
+                *chunk.as_mut().unwrap()[c2.idx] = c1_c;
 
                 // mark as updated
-                next_chunk.as_mut().unwrap()[c2.idx].updated = 1;
+                chunk.as_mut().unwrap()[c2.idx].updated = 1;
             },
         }
         true
@@ -170,12 +166,12 @@ impl<'a> ChunkWorker<'a> {
         }
     }
 
-    fn get_cell_next(&self, x: i32, y: i32) -> Option<&Cell> {
+    fn get_cell(&self, x: i32, y: i32) -> Option<&Cell> {
         let idx = self.get_worker_index(x, y);
         match idx.chunk_rel {
-            (0, 0) => Some(&self.chunk.next_cells[idx.idx]),
+            (0, 0) => Some(&self.chunk.cells[idx.idx]),
             (x, y) => {
-                match self.surrounding_next.get(&(x, y)) {
+                match self.surrounding.get(&(x, y)) {
                     None => None,
                     Some(chunk) => {
                         match chunk {
@@ -192,15 +188,15 @@ impl<'a> ChunkWorker<'a> {
         }
     }
 
-    fn get_other_cell_next(&self, idx: &WorkerIndex, dir: DirectionType) -> Option<&Cell> {
+    fn get_other_cell(&self, idx: &WorkerIndex, dir: DirectionType) -> Option<&Cell> {
         let (x, y) = (idx.x, idx.y);
         let other_idx = dir.get_tuple_direction();
         let other_idx = (x + other_idx.0, y + other_idx.1);
         let other_idx = self.get_worker_index(other_idx.0, other_idx.1);
         match other_idx.chunk_rel {
-            (0, 0) => Some(&self.chunk.next_cells[other_idx.idx]),
+            (0, 0) => Some(&self.chunk.cells[other_idx.idx]),
             (x, y) => {
-                match self.surrounding_next.get(&(x, y)) {
+                match self.surrounding.get(&(x, y)) {
                     None => None,
                     Some(chunk) => {
                         match chunk {
@@ -220,12 +216,12 @@ impl<'a> ChunkWorker<'a> {
 
     // This is a helper function combining downward_Fall, down_side, and apply_velocity
     fn down_and_side(&mut self, idx: &WorkerIndex) -> bool {
-        let density = self.chunk.next_cells[idx.idx].get_density();
+        let density = self.chunk.cells[idx.idx].get_density();
 
         // Check which of the option in which we can move
-        let can_down = self.get_other_cell_next(idx, DirectionType::DOWN).is_some_and(|t| t.get_density() < density);
-        let can_dleft = self.get_other_cell_next(idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density);
-        let can_dright = self.get_other_cell_next(idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density);
+        let can_down = self.get_other_cell(idx, DirectionType::DOWN).is_some_and(|t| t.get_density() < density);
+        let can_dleft = self.get_other_cell(idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density);
+        let can_dright = self.get_other_cell(idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density);
 
         if can_down && !(can_dleft || can_dright) {
             // Try downward fall
@@ -248,13 +244,13 @@ impl<'a> ChunkWorker<'a> {
     fn downward_fall(&mut self, idx: &WorkerIndex) -> bool {
         let (x, y) = (idx.x, idx.y);
 
-        let cell = &self.chunk.next_cells[idx.idx];
+        let cell = &self.chunk.cells[idx.idx];
 
-        let down_next = self.get_other_cell_next(&idx, DirectionType::DOWN);
+        let down_next = self.get_other_cell(&idx, DirectionType::DOWN);
         // we want to swap down if the cell below has a lower density AND the one below that has a higher density (else want to become particle like)
         if down_next.is_some_and(|t| t.get_density() < cell.get_density()) {
             let new_idx = self.get_worker_index(x, y - 1);
-            let two_below = self.get_cell_next(x, y - 2);
+            let two_below = self.get_cell(x, y - 2);
             if two_below.is_none() || two_below.unwrap().get_density() >= cell.get_density() {
                 return self.swap_cells(idx, &new_idx);
             }
@@ -264,10 +260,10 @@ impl<'a> ChunkWorker<'a> {
 
     fn down_side(&mut self, idx: &WorkerIndex) -> bool {
         let (x, y) = (idx.x, idx.y);
-        let left = self.get_other_cell_next(&idx, DirectionType::DOWN_LEFT);
-        let right = self.get_other_cell_next(&idx, DirectionType::DOWN_RIGHT);
+        let left = self.get_other_cell(&idx, DirectionType::DOWN_LEFT);
+        let right = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT);
         // get types and make sure they are empty and has not been updated
-        let density = self.chunk.next_cells[idx.idx].get_density();
+        let density = self.chunk.cells[idx.idx].get_density();
         let mut move_left = left.is_some_and(|t| t.get_density() < density);
         let mut move_right = right.is_some_and(|t| t.get_density() < density);
         if move_left && move_right {
@@ -279,7 +275,7 @@ impl<'a> ChunkWorker<'a> {
         if move_left {
             let other_idx = self.get_worker_index(x - 1, y - 1);
             // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
+            if self.get_other_cell(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
                 return self.swap_cells(idx, &other_idx);
             } else {
                 return self.apply_velocity(&idx);
@@ -288,7 +284,7 @@ impl<'a> ChunkWorker<'a> {
         else if move_right {
             let other_idx = self.get_worker_index(x + 1, y - 1);
             // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell_next(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
+            if self.get_other_cell(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
                 return self.swap_cells(idx, &other_idx);
             } else {
                 return self.apply_velocity(&idx);
@@ -299,10 +295,10 @@ impl<'a> ChunkWorker<'a> {
 
     fn sideways(&mut self, idx: &WorkerIndex) -> bool {
         let (x, y) = (idx.x, idx.y);
-        let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
-        let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
+        let left = self.get_other_cell(&idx, DirectionType::LEFT);
+        let right = self.get_other_cell(&idx, DirectionType::RIGHT);
         // get types and make sure they are empty and has not been updated
-        let density = self.chunk.next_cells[idx.idx].get_density();
+        let density = self.chunk.cells[idx.idx].get_density();
         let mut move_left = left.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
         let mut move_right = right.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
         if move_left && move_right {
@@ -325,7 +321,7 @@ impl<'a> ChunkWorker<'a> {
     // Applies a force in direction with amount
     fn apply_force(&mut self, source: &WorkerIndex, direction: DirectionType, amount: f32) {
         // check direction exists
-        let cell_in_direction = match self.get_other_cell_next(source, direction) {
+        let cell_in_direction = match self.get_other_cell(source, direction) {
             Some(cell) => cell.clone(),
             None => {
                 Cell::new(CellType::Stone, DirectionType::NONE)
@@ -334,7 +330,7 @@ impl<'a> ChunkWorker<'a> {
         let other_density = cell_in_direction.get_density();
         let max_speed = self.chunk.width as f32;
 
-        let cell = &mut self.chunk.next_cells[source.idx];
+        let cell = &mut self.chunk.cells[source.idx];
         // Clamp current velocity
         cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
 
@@ -414,12 +410,12 @@ impl<'a> ChunkWorker<'a> {
 
     // Adds some sideways velocity to simulate liquid movement
     fn liquid_movement(&mut self, idx: &WorkerIndex) {
-        let cell = &self.chunk.next_cells[idx.idx];
-        let down_density = self.get_other_cell_next(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(1000.);
+        let cell = &self.chunk.cells[idx.idx];
+        let down_density = self.get_other_cell(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(1000.);
         let cell_density = cell.get_density();
         if down_density >= cell_density && cell.velocity.x.abs() <= 7. {
-            let left = self.get_other_cell_next(&idx, DirectionType::LEFT);
-            let right = self.get_other_cell_next(&idx, DirectionType::RIGHT);
+            let left = self.get_other_cell(&idx, DirectionType::LEFT);
+            let right = self.get_other_cell(&idx, DirectionType::RIGHT);
             // get types and make sure they are empty and has not been updated
             let mut move_left = cell.velocity.x < 0.;
             let mut move_right = cell.velocity.x > 0.;
@@ -436,7 +432,7 @@ impl<'a> ChunkWorker<'a> {
             }
 
             let acceleration = 0.4;
-            let cell = &mut self.chunk.next_cells[idx.idx];
+            let cell = &mut self.chunk.cells[idx.idx];
             if move_right {
                 if cell.velocity.x < 0. {
                     cell.velocity.x = 0.;
@@ -452,7 +448,7 @@ impl<'a> ChunkWorker<'a> {
     }
 
     fn apply_velocity(&mut self, idx: &WorkerIndex) -> bool {
-        let cell = &mut self.chunk.next_cells[idx.idx];
+        let cell = &mut self.chunk.cells[idx.idx];
         let cell_density = cell.get_density();
 
         let vector_length = cell.velocity.length();
@@ -489,25 +485,25 @@ impl<'a> ChunkWorker<'a> {
             let (x, y) = ((x as f32 - (f_x * i as f32)).round() as i32, (y as f32 - (f_y * i as f32)).round() as i32);
 
             // trying to move here
-            let other_cell = self.get_cell_next(x, y);
+            let other_cell = self.get_cell(x, y);
 
             // cell is none or solid, cannot move futher
             if other_cell.is_none() || matches!(other_cell.unwrap().get_state_type(), StateType::HardSolid(_)) {
                 if i == 1 || other_cell.is_none() {
                     // immediately stoped
-                    let cell = &mut self.chunk.next_cells[idx.idx];
+                    let cell = &mut self.chunk.cells[idx.idx];
                     cell.velocity = Vec2::ZERO;
                     return false;
                 } else {
                     if max_x != idx.x as f32 || max_y != idx.y as f32 {
                         // move to max_x, max_y
-                        let cell = &mut self.chunk.next_cells[idx.idx];
+                        let cell = &mut self.chunk.cells[idx.idx];
                         cell.velocity *= drag;
                         let new_idx = self.get_worker_index(max_x as i32, max_y as i32);
                         return self.swap_cells(idx, &new_idx);
                     } else {
                         // stop
-                        let cell = &mut self.chunk.next_cells[idx.idx];
+                        let cell = &mut self.chunk.cells[idx.idx];
                         cell.velocity = Vec2::ZERO;
                         return false;
                     }
@@ -524,13 +520,13 @@ impl<'a> ChunkWorker<'a> {
             if i == vector_length.round() as i32 {
                 if max_x != idx.x as f32 || max_y != idx.y as f32 {
                     // move to max_x, max_y
-                    let cell = &mut self.chunk.next_cells[idx.idx];
+                    let cell = &mut self.chunk.cells[idx.idx];
                     cell.velocity *= drag;
                     let new_idx = self.get_worker_index(max_x as i32, max_y as i32);
                     return self.swap_cells(idx, &new_idx);
                 } else {
                     // stop
-                    let cell = &mut self.chunk.next_cells[idx.idx];
+                    let cell = &mut self.chunk.cells[idx.idx];
                     cell.velocity = Vec2::ZERO;
                     return false;
                 }
@@ -652,10 +648,9 @@ mod tests {
 
         let chunks = &mut world.chunks_lookup;
         let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-        let mut future_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-        get_chunk_references(chunks, &mut current_references, &mut future_references, (1, 1));
+        get_chunk_references(chunks, &mut current_references, (1, 1));
 
-        let test_worker = ChunkWorker::new_from_chunk_ref(&(1, 1), &mut current_references, &mut future_references, true);
+        let test_worker = ChunkWorker::new_from_chunk_ref(&(1, 1), &mut current_references, true);
 
         assert_eq!(test_worker.chunk.get_pos(), (1, 1));
         // Bottom left corner chunk
