@@ -1,14 +1,13 @@
 use bevy::{math::vec2, prelude::*};
 use bevy_rapier2d::prelude::*;
 use contour::ContourBuilder;
-use geo::{SimplifyVwPreserve, TriangulateEarcut};
-use strum::IntoEnumIterator;
+use geo::{Simplify, TriangulateEarcut};
 
-use crate::{cell_types::StateType, pixel_plugin::PixelSimulation};
+use crate::pixel_plugin::PixelSimulation;
 
 use super::RigidStorage;
 
-// Generate colliders for every rigid body
+// Generate colliders for each chunk
 pub fn generate_colliders(
     pixel_sim: Query<&mut PixelSimulation>,
     mut rigid_storage: ResMut<RigidStorage>,
@@ -21,48 +20,48 @@ pub fn generate_colliders(
     let chunk_width = world.get_chunk_width();
     let chunk_height = world.get_chunk_height();
 
-    let chunks = world.get_chunks();
-
+    // Need to calculate world origin
     let origin_x = -width / 2;
     let origin_y = -height / 2;
 
-    for (i, chunk) in chunks.iter().enumerate() {
+    for (i, chunk) in world.get_chunks().iter().enumerate() {
         // Remove existing colliders
         cleanup_colliders(&mut rigid_storage, i, &mut commands);
 
         let mut colliders = vec![];
-        // iterate over different types of state, later might want to specify collision types
-        for state_type in StateType::iter() {
-            if matches!(state_type, StateType::Empty(_)) {
-                continue;
-            }
 
-            // Marching squares
-            let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
-                                                    .x_origin(origin_x + (chunk.pos_x * chunk_width))
-                                                    .y_origin(origin_y + (chunk.pos_y * chunk_height))
-                                                    .x_step(1.0)
-                                                    .y_step(1.0);
-            let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
+        // Apply the contour builder to the chunk
+        // This uses the marching squares algorithm to create contours from the chunk data
+        let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
+                                                // Adjust origin based on chunk position
+                                                .x_origin(origin_x + (chunk.pos_x * chunk_width))
+                                                .y_origin(origin_y + (chunk.pos_y * chunk_height))
+                                                .x_step(1.0)
+                                                .y_step(1.0);
+        let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
 
-            for contour in contours {
-                let geometry = contour.geometry().simplify_vw_preserve(&1.5);
+        // Simplify and triangulate each contours
+        for contour in contours {
+            // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
+            // RDP seems to be much faster generally
+            let geometry = contour.geometry().simplify(&1.5);
 
-                for poly in geometry {
-                    let triangles = poly.earcut_triangles();
-                    for triangle in triangles {
-                        let collider = Collider::triangle(
-                            vec2(triangle.0.x as f32, triangle.0.y as f32),
-                            vec2(triangle.1.x as f32, triangle.1.y as f32),
-                            vec2(triangle.2.x as f32, triangle.2.y as f32),
-                        );
+            for poly in geometry {
+                // Triangulate the polygon using the earcut algorithm and place into collider
+                let triangles = poly.earcut_triangles();
+                for triangle in triangles {
+                    let collider = Collider::triangle(
+                        vec2(triangle.0.x as f32, triangle.0.y as f32),
+                        vec2(triangle.1.x as f32, triangle.1.y as f32),
+                        vec2(triangle.2.x as f32, triangle.2.y as f32),
+                    );
 
-                        colliders.push((Vec2::ZERO, 0.0, collider));
-                    }
+                    colliders.push((Vec2::ZERO, 0.0, collider));
                 }
             }
         }
         if !colliders.is_empty() {
+            // Combine all colliders into a single collider
             let combined = Collider::compound(colliders);
             let id = commands.spawn(combined).id();
             rigid_storage.colliders[i] = Some(vec![id]);
