@@ -105,6 +105,19 @@ impl PixelChunk {
             self.set_cell(x, y, cell);
         }
     }
+
+    pub fn cells_as_floats(&self) -> Vec<f64> {
+        // Map each cell to a float depending on if it is solid
+        // range 0.0-1.0
+
+        self.cells.iter().map(|cell| {
+            if cell.get_type() == CellType::Empty {
+                0.0
+            } else {
+                1.0
+            }
+        }).collect::<Vec<f64>>()
+    }
 }
 
 fn split_top_bottom_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
