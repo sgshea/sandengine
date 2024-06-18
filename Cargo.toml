@@ -11,7 +11,6 @@ bevy = { version = "0.13.0", features = ["dynamic_linking"] }
 bevy_mod_picking = { version = "0.19.0", default-features = false, features = ["backend_egui", "backend_sprite"] }
 # bevy_egui = "0.24.0" # bevy_egui is re-exported by bevy_mod_picking
 
-rayon = "1.9.0"
 bitflags = "2.4.2"
 rand = "0.8.5"
 strum = { version="0.26.1", features=["derive"] }
