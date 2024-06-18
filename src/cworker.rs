@@ -54,20 +54,27 @@ impl<'a> ChunkWorker<'a> {
             },
             StateType::SoftSolid(_) => {
                 let idx = self.get_worker_index(x, y);
-                self.apply_gravity(&idx);
-                self.down_and_side(&idx);
+                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+
+                if down_empty && (!(down_left_empty || down_right_empty) || rand::thread_rng().gen_range(0..10) != 0) {
+                    self.downward_fall(&idx);
+                } else {
+                    self.down_side(&idx);
+                }
             }
             StateType::Liquid(cell_type) => {
                 let idx = self.get_worker_index(x, y);
                 self.apply_gravity(&idx);
                 self.downward_fall(&idx);
                 // liquid movement (don't do every frame)
-                if rand::thread_rng().gen_bool(cell_type.cell_inertia() as f64) {
-                    self.liquid_movement(&idx);
-                }
-                if self.apply_velocity(&idx) {
-                    return;
-                }
+                // if rand::thread_rng().gen_bool(cell_type.cell_inertia() as f64) {
+                //     self.liquid_movement(&idx);
+                // }
+                // if self.apply_velocity(&idx) {
+                //     return;
+                // }
                 if self.sideways(&idx) {
                     return;
                 }
@@ -105,7 +112,6 @@ impl<'a> ChunkWorker<'a> {
                 self.chunk.cells[c2.idx].updated = 1;
             },
             (x, y) => {
-                // get both current and next of the chunk
                 let chunk = self.surrounding.get_mut(&(x, y)).unwrap();
 
                 // if the cell has been updated, we cannot swap
@@ -214,80 +220,62 @@ impl<'a> ChunkWorker<'a> {
         }
     }
 
-    // This is a helper function combining downward_Fall, down_side, and apply_velocity
-    fn down_and_side(&mut self, idx: &WorkerIndex) -> bool {
-        let density = self.chunk.cells[idx.idx].get_density();
-
-        // Check which of the option in which we can move
-        let can_down = self.get_other_cell(idx, DirectionType::DOWN).is_some_and(|t| t.get_density() < density);
-        let can_dleft = self.get_other_cell(idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() < density);
-        let can_dright = self.get_other_cell(idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() < density);
-
-        if can_down && !(can_dleft || can_dright) {
-            // Try downward fall
-            if self.downward_fall(&idx) {
-                return true;
-            } else {
-                return self.apply_velocity(&idx)
-            }
-        } else if can_down && rand::thread_rng().gen_bool(0.8) {
-            if self.downward_fall(idx) {
-                return true;
-            } else {
-                return self.apply_velocity(idx);
-            }
-        } else {
-            return self.down_side(idx);
-        }
-    }
-
     fn downward_fall(&mut self, idx: &WorkerIndex) -> bool {
-        let (x, y) = (idx.x, idx.y);
+        // are few below clear
+        let empty_below = (0..4).all(|i| {
+            let other_cell = self.get_cell(idx.x, idx.y - 2 - i);
+            other_cell.is_some() && matches!(other_cell.unwrap().get_state_type(), StateType::Empty(_))
+        });
 
-        let cell = &self.chunk.cells[idx.idx];
-
-        let down_next = self.get_other_cell(&idx, DirectionType::DOWN);
-        // we want to swap down if the cell below has a lower density AND the one below that has a higher density (else want to become particle like)
-        if down_next.is_some_and(|t| t.get_density() < cell.get_density()) {
-            let new_idx = self.get_worker_index(x, y - 1);
-            let two_below = self.get_cell(x, y - 2);
-            if two_below.is_none() || two_below.unwrap().get_density() >= cell.get_density() {
+        if empty_below {
+            self.apply_gravity(idx);
+            return self.apply_velocity(idx);
+        } else {
+            // move 1 or 2 steps down
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                let new_idx = self.get_worker_index(idx.x, idx.y - 2);
+                return self.swap_cells(idx, &new_idx);
+            } else {
+                let new_idx = self.get_worker_index(idx.x, idx.y - 1);
                 return self.swap_cells(idx, &new_idx);
             }
         }
-        false
     }
 
     fn down_side(&mut self, idx: &WorkerIndex) -> bool {
-        let (x, y) = (idx.x, idx.y);
-        let left = self.get_other_cell(&idx, DirectionType::DOWN_LEFT);
-        let right = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT);
-        // get types and make sure they are empty and has not been updated
-        let density = self.chunk.cells[idx.idx].get_density();
-        let mut move_left = left.is_some_and(|t| t.get_density() < density);
-        let mut move_right = right.is_some_and(|t| t.get_density() < density);
-        if move_left && move_right {
-            // choose 50/50
-            move_left = rand::thread_rng().gen_bool(0.5);
-            move_right = !move_left;
-        }
+        let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+        let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+        let above_empty = self.get_other_cell(&idx, DirectionType::UP).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
 
-        if move_left {
-            let other_idx = self.get_worker_index(x - 1, y - 1);
-            // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell(&other_idx, DirectionType::DOWN_LEFT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
-                return self.swap_cells(idx, &other_idx);
-            } else {
-                return self.apply_velocity(&idx);
-            }
-        }
-        else if move_right {
-            let other_idx = self.get_worker_index(x + 1, y - 1);
-            // lets also check if it could move futher and we should do velocity
-            if self.get_other_cell(&other_idx, DirectionType::DOWN_RIGHT).is_some_and(|t| t.get_density() >= density) || rand::thread_rng().gen_bool(0.8) {
-                return self.swap_cells(idx, &other_idx);
-            } else {
-                return self.apply_velocity(&idx);
+        // covered cells less likely to move down to sides
+        if above_empty || rand::thread_rng().gen_bool(0.5) {
+            if down_left_empty && down_right_empty {
+                // choose 50/50
+                let move_left = rand::thread_rng().gen_bool(0.5);
+                let new_idx = if move_left {
+                    self.get_worker_index(idx.x - 1, idx.y - 1)
+                } else {
+                    self.get_worker_index(idx.x + 1, idx.y - 1)
+                };
+                return self.swap_cells(idx, &new_idx);
+            } else if down_left_empty {
+                // chance to move down by 2
+                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 1, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                    let new_idx = self.get_worker_index(idx.x - 1, idx.y - 2);
+                    return self.swap_cells(idx, &new_idx);
+                } else {
+                    let new_idx = self.get_worker_index(idx.x - 1, idx.y - 1);
+                    return self.swap_cells(idx, &new_idx);
+                }
+            } else if down_right_empty {
+                // chance to move down by 2
+                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 1, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                    let new_idx = self.get_worker_index(idx.x + 1, idx.y - 2);
+                    return self.swap_cells(idx, &new_idx);
+                } else {
+                    let new_idx = self.get_worker_index(idx.x + 1, idx.y - 1);
+                    return self.swap_cells(idx, &new_idx);
+                }
             }
         }
         false

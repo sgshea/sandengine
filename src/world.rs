@@ -131,7 +131,6 @@ impl PixelWorld {
             let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
             get_chunk_references(chunks, &mut current_references, iteration_x_y);
 
-            let mut workers: Vec<ChunkWorker> = Vec::new();
             all_pos.iter().for_each(|pos| {
                 let x = (pos.0 + iteration_x_y.0) % 2 == 0;
                 let y = (pos.1 + iteration_x_y.1) % 2 == 0;
@@ -140,11 +139,8 @@ impl PixelWorld {
                     // we can borrow on each iteration because no references to the hashmap items are kept
                     // the ChunkWorker removes the center chunk from the hashmap, so we can borrow the hashmap again
                     // the needed parts of the SplitChunk are also removed from the hashmap using mem::take and similarly not kept in the hashmaps
-                    workers.push(ChunkWorker::new_from_chunk_ref(pos, &mut current_references, self.iteration % 2 == 0));
+                    ChunkWorker::new_from_chunk_ref(pos, &mut current_references, self.iteration % 2 == 0).update();
                 }
-            });
-            workers.iter_mut().for_each(|worker| {
-                worker.update();
             });
         }
         // reset updated_at and swap buffers
