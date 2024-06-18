@@ -64,19 +64,16 @@ impl<'a> ChunkWorker<'a> {
                     self.down_side(&idx);
                 }
             }
-            StateType::Liquid(cell_type) => {
+            StateType::Liquid(_) => {
                 let idx = self.get_worker_index(x, y);
-                self.apply_gravity(&idx);
-                self.downward_fall(&idx);
-                // liquid movement (don't do every frame)
-                // if rand::thread_rng().gen_bool(cell_type.cell_inertia() as f64) {
-                //     self.liquid_movement(&idx);
-                // }
-                // if self.apply_velocity(&idx) {
-                //     return;
-                // }
-                if self.sideways(&idx) {
-                    return;
+
+                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                if down_empty && (!(left_empty || right_empty) || rand::thread_rng().gen_bool(0.9)) {
+                    self.downward_fall(&idx);
+                } else {
+                    self.sideways(&idx);
                 }
             }
             StateType::Gas(_) => {
@@ -282,26 +279,34 @@ impl<'a> ChunkWorker<'a> {
     }
 
     fn sideways(&mut self, idx: &WorkerIndex) -> bool {
-        let (x, y) = (idx.x, idx.y);
-        let left = self.get_other_cell(&idx, DirectionType::LEFT);
-        let right = self.get_other_cell(&idx, DirectionType::RIGHT);
-        // get types and make sure they are empty and has not been updated
-        let density = self.chunk.cells[idx.idx].get_density();
-        let mut move_left = left.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
-        let mut move_right = right.is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)) && t.get_density() < density);
-        if move_left && move_right {
-            // choose 50/50
-            move_left = rand::thread_rng().gen_bool(0.5);
-            move_right = !move_left;
-        }
+        let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+        let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
 
-        if move_left {
-            let other_idx = self.get_worker_index(x - 1, y);
-            return self.swap_cells(idx, &other_idx);
-        }
-        else if move_right {
-            let other_idx = self.get_worker_index(x + 1, y);
-            return self.swap_cells(idx, &other_idx);
+        if left_empty && right_empty {
+            // choose 50/50
+            let move_left = rand::thread_rng().gen_bool(0.5);
+            let new_idx = if move_left {
+                self.get_worker_index(idx.x - 1, idx.y)
+            } else {
+                self.get_worker_index(idx.x + 1, idx.y)
+            };
+            return self.swap_cells(idx, &new_idx);
+        } else if left_empty {
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 2, idx.y).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                let new_idx = self.get_worker_index(idx.x - 2, idx.y);
+                return self.swap_cells(idx, &new_idx);
+            } else {
+                let new_idx = self.get_worker_index(idx.x - 1, idx.y);
+                return self.swap_cells(idx, &new_idx);
+            }
+        } else if right_empty {
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 2, idx.y).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                let new_idx = self.get_worker_index(idx.x + 2, idx.y);
+                return self.swap_cells(idx, &new_idx);
+            } else {
+                let new_idx = self.get_worker_index(idx.x + 1, idx.y);
+                return self.swap_cells(idx, &new_idx);
+            }
         }
         false
     }
