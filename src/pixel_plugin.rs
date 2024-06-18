@@ -2,7 +2,6 @@ use std::time;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
-use rayon::prelude::*;
 
 use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
 
@@ -143,7 +142,7 @@ fn render_pixel_simulation(
     let start = time::Instant::now();
     for sim in query.iter_mut() {
         let image = images.get_mut(&sim.image_handle).unwrap();
-        image.data.par_chunks_mut(4).enumerate().for_each(|(i, pixel)| {
+        image.data.chunks_mut(4).enumerate().for_each(|(i, pixel)| {
             let x = i as i32 % WORLD_SIZE.0;
             let y = i as i32 / WORLD_SIZE.0;
             let cell = sim.world.get_cell(x, y).expect("Cell out of bounds");
