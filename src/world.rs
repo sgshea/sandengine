@@ -1,4 +1,3 @@
-use rayon::prelude::*;
 use bevy::utils::hashbrown::HashMap;
 
 use crate::{cell::Cell, chunk::{PixelChunk, SplitChunk}, cworker::ChunkWorker};
@@ -144,7 +143,7 @@ impl PixelWorld {
             });
         }
         // reset updated_at and swap buffers
-        self.chunks_lookup.values_mut().par_bridge().for_each(|chunk| {
+        self.chunks_lookup.values_mut().for_each(|chunk| {
             // swap buffers and reset updated
             chunk.cells.iter_mut().for_each(|cell| {
                 cell.updated = 0;
