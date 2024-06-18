@@ -70,7 +70,7 @@ impl<'a> ChunkWorker<'a> {
                 let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
                 let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
                 let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-                if down_empty && (!(left_empty || right_empty) || rand::thread_rng().gen_bool(0.9)) {
+                if down_empty && (!(left_empty || right_empty) || rand::thread_rng().gen_bool(0.95)) {
                     self.downward_fall(&idx);
                 } else {
                     self.sideways(&idx);
@@ -100,13 +100,17 @@ impl<'a> ChunkWorker<'a> {
 
         match c2.chunk_rel {
             (0, 0) => {
-                if self.chunk.cells[c1.idx].updated == 1 || self.chunk.cells[c2.idx].updated == 1 {
+                // If the cell has been updated, but is empty, give a small chance to still swap
+                if self.chunk.cells[c1.idx].updated == 1 ||
+                 (self.chunk.cells[c2.idx].updated == 1 && !matches!(self.chunk.cells[c2.idx].get_state_type(), StateType::Empty(_))
+                 && rand::thread_rng().gen_bool(0.1)) {
                     return false;
                 }
                 self.chunk.cells.swap(c1.idx, c2.idx);
 
                 // mark as updated
                 self.chunk.cells[c2.idx].updated = 1;
+                self.chunk.cells[c1.idx].updated = 1;
             },
             (x, y) => {
                 let chunk = self.surrounding.get_mut(&(x, y)).unwrap();
@@ -122,6 +126,7 @@ impl<'a> ChunkWorker<'a> {
 
                 // mark as updated
                 chunk.as_mut().unwrap()[c2.idx].updated = 1;
+                self.chunk.cells[c1.idx].updated = 1;
             },
         }
         true
@@ -285,12 +290,12 @@ impl<'a> ChunkWorker<'a> {
         if left_empty && right_empty {
             // choose 50/50
             let move_left = rand::thread_rng().gen_bool(0.5);
-            let new_idx = if move_left {
-                self.get_worker_index(idx.x - 1, idx.y)
-            } else {
-                self.get_worker_index(idx.x + 1, idx.y)
-            };
-            return self.swap_cells(idx, &new_idx);
+            // Try each, if swap fails, try the other direction
+            if move_left && self.swap_cells(idx, &self.get_worker_index(idx.x - 1, idx.y)) {
+                return true;
+            } else if !move_left && self.swap_cells(idx, &self.get_worker_index(idx.x + 1, idx.y)) {
+                return true;
+            } return false;
         } else if left_empty {
             if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 2, idx.y).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
                 let new_idx = self.get_worker_index(idx.x - 2, idx.y);
