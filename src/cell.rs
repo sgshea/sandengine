@@ -53,6 +53,7 @@ impl Cell {
             StateType::HardSolid(ctype) => ctype,
             StateType::Liquid(ctype) => ctype,
             StateType::Gas(ctype) => ctype,
+            StateType::Special => CellType::Empty,
         }
     }
 
