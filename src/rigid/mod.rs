@@ -11,8 +11,6 @@ use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dS
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
 use rigidbodies::generate_colliders;
 
-use crate::WORLD_SIZE;
-
 use super::CHUNKS;
 
 pub struct SandEngineRigidPlugin;
@@ -56,8 +54,6 @@ impl Default for RigidStorage {
 
 // Setting simple stage
 fn setup_physics_environment(mut commands: Commands) {
-    let bottom_y = (WORLD_SIZE.1 / 2) as f32;
-
     let mut cmd = commands.spawn(Name::new("Floor"));
     cmd.insert(SpriteBundle {
         sprite: Sprite {
@@ -69,49 +65,49 @@ fn setup_physics_environment(mut commands: Commands) {
     });
     cmd.insert(Collider::halfspace(Vec2::Y).unwrap());
     // move the floor to the bottom of the screen
-    cmd.insert(Transform::from_xyz(0.0, -bottom_y, 0.0));
+    cmd.insert(Transform::from_xyz(0.0, 0.0, 0.0));
 
-    for (name, [width, height], transform) in [
-        (
-            "Moderate Slope",
-            [30.0, 0.1],
-            Transform::from_xyz(37.0, -bottom_y + 7.0, 0.0).with_rotation(Quat::from_rotation_z(0.6)),
-        ),
-        (
-            "Steep Slope",
-            [20.0, 0.1],
-            Transform::from_xyz(74.0, -bottom_y + 14.0, 0.0).with_rotation(Quat::from_rotation_z(1.0)),
-        ),
-        (
-            "Box to Step on",
-            [6.0, 2.0],
-            Transform::from_xyz(-34.0, -bottom_y + 1.0, 0.0),
-        ),
-        (
-            "Floating Box",
-            [8.0, 2.0],
-            Transform::from_xyz(-60.0, -bottom_y + 4.0, 0.0),
-        ),
-    ] {
-        let mut cmd = commands.spawn(Name::new(name));
-        cmd.insert(SpriteBundle {
-            sprite: Sprite {
-                custom_size: Some(Vec2::new(width, height)),
-                color: Color::GRAY,
-                ..Default::default()
-            },
-            transform,
-            ..Default::default()
-        });
-        cmd.insert(Collider::cuboid(0.5 * width, 0.5 * height));
-    }
+    // for (name, [width, height], transform) in [
+    //     (
+    //         "Moderate Slope",
+    //         [30.0, 0.1],
+    //         Transform::from_xyz(37.0, 7.0, 0.0).with_rotation(Quat::from_rotation_z(0.6)),
+    //     ),
+    //     (
+    //         "Steep Slope",
+    //         [20.0, 0.1],
+    //         Transform::from_xyz(74.0, 14.0, 0.0).with_rotation(Quat::from_rotation_z(1.0)),
+    //     ),
+    //     (
+    //         "Box to Step on",
+    //         [6.0, 2.0],
+    //         Transform::from_xyz(-34.0, 1.0, 0.0),
+    //     ),
+    //     (
+    //         "Floating Box",
+    //         [8.0, 2.0],
+    //         Transform::from_xyz(-60.0, 4.0, 0.0),
+    //     ),
+    // ] {
+    //     let mut cmd = commands.spawn(Name::new(name));
+    //     cmd.insert(SpriteBundle {
+    //         sprite: Sprite {
+    //             custom_size: Some(Vec2::new(width, height)),
+    //             color: Color::GRAY,
+    //             ..Default::default()
+    //         },
+    //         transform,
+    //         ..Default::default()
+    //     });
+    //     cmd.insert(Collider::cuboid(0.5 * width, 0.5 * height));
+    // }
 }
 
 fn setup_player(mut commands: Commands) {
 
     let mut cmd = commands.spawn_empty();
     cmd.insert(TransformBundle::from_transform(Transform::from_xyz(
-        0.0, 10.0, 0.0,
+        30.0, 10.0, 0.0,
     )));
     cmd.insert(VisibilityBundle::default());
 
