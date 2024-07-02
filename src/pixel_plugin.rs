@@ -43,6 +43,7 @@ fn setup_pixel_simulation(
             near: -1000.0,
             ..default()
         },
+        transform: Transform::from_xyz(WORLD_SIZE.0 as f32 / 2.0, WORLD_SIZE.1 as f32 / 2.0, 1000.0),
         ..default()
     }, MainCamera));
 
@@ -67,7 +68,10 @@ fn setup_pixel_simulation(
     // Image does not fill entire screen
     // Will refactor/handle later once we have chunks as may decide to render each chunk separately (attaching image to each)
     commands.spawn((
-        SpatialBundle::default(),
+        SpatialBundle {
+            transform: Transform::from_xyz(WORLD_SIZE.0 as f32 / 2.0, WORLD_SIZE.1 as f32 / 2.0, 0.0),
+            ..default()
+        },
         PixelSimulation {
             world,
             image_handle: image_handle.clone(),

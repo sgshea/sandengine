@@ -158,6 +158,9 @@ pub fn draw_chunk_gizmos(
     mut chunk_gizmos: Gizmos<ChunkGizmos>,
     pixel_query: Query<&PixelSimulation>,
 ) {
+    let origin_x = WORLD_SIZE.0 as f32 / 2.0;
+    let origin_y = WORLD_SIZE.1 as f32 / 2.0;
+
     let sim = pixel_query.single();
 
     let awake_chunks = sim.world.get_awake_chunk_locs();
@@ -167,7 +170,10 @@ pub fn draw_chunk_gizmos(
         let pos_x = ((x as f32 * CHUNK_SIZE.0 as f32) - WORLD_SIZE.0 as f32 / 2.0) + CHUNK_SIZE.0 as f32 / 2.0;
         let pos_y = ((y as f32 * CHUNK_SIZE.1 as f32) - WORLD_SIZE.1 as f32 / 2.0) + CHUNK_SIZE.1 as f32 / 2.0;
         chunk_gizmos.rect_2d(
-            Vec2::new(pos_x, pos_y),
+            Vec2::new(
+                pos_x + origin_x,
+                pos_y + origin_y,
+            ),
             0.0,
             Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
             Color::rgba(0.0, 1.0, 0.0, 0.5),
