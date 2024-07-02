@@ -2,9 +2,6 @@ use bitflags::bitflags;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
-// Maximum density of a cell
-const MAX_DENSITY: f32 = 100.0;
-
 #[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
 pub enum CellType {
     Empty,
@@ -31,18 +28,6 @@ impl CellType {
             CellType::Stone => 100.0,
             CellType::Water => 50.0,
             CellType::Smoke => 10.0,
-        }
-    }
-
-    // Inertia is how likely a cell will choose to stay in place (not look sideways for a new cell to move to)
-    pub fn cell_inertia(&self) -> f32 {
-        match self {
-            CellType::Empty => 0.0,
-            CellType::Sand => 0.5,
-            CellType::Dirt => 0.65,
-            CellType::Stone => 0.9,
-            CellType::Water => 0.4,
-            CellType::Smoke => 0.2,
         }
     }
 
@@ -103,6 +88,7 @@ pub enum StateType {
     HardSolid(CellType), // Hard solid, like stone that can't move
     Liquid(CellType),
     Gas(CellType),
+    Special, // Special markers that don't fit into the above categories, for now used for rigid bodies
 }
 
 impl Default for StateType {
