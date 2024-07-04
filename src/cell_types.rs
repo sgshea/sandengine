@@ -2,6 +2,8 @@ use bitflags::bitflags;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
+use crate::cell::Cell;
+
 #[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
 pub enum CellType {
     Empty,

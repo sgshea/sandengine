@@ -1,80 +1,84 @@
-use bevy::{math::vec2, prelude::*};
+use bevy::{prelude::*, sprite::Anchor};
 use bevy_rapier2d::prelude::*;
-use contour::ContourBuilder;
-use geo::{Simplify, TriangulateEarcut};
 
-use crate::pixel_plugin::PixelSimulation;
 
-use super::RigidStorage;
+use super::collider_generation::create_collider;
 
-// Generate colliders for each chunk
-pub fn generate_colliders(
-    pixel_sim: Query<&mut PixelSimulation>,
-    mut rigid_storage: ResMut<RigidStorage>,
-    mut commands: Commands,
-) {
-    let world = &pixel_sim.single().world;
+// DynamicPhysicsEntity (DPE) is created each frame for the RigidBodyImageHandle, to faciliate interaction with the pixel engine
+#[derive(Component)]
+pub struct DynamicPhysicsEntity {
+    pub width: u32,
+    pub height: u32,
 
-    let chunk_width = world.get_chunk_width();
-    let chunk_height = world.get_chunk_height();
+    pub position: Vec2,
 
-    for (i, chunk) in world.get_chunks().iter().enumerate() {
-        // Remove existing colliders
-        cleanup_colliders(&mut rigid_storage, i, &mut commands);
+    pub image: Option<Handle<Image>>,
 
-        let mut colliders = vec![];
-
-        // Apply the contour builder to the chunk
-        // This uses the marching squares algorithm to create contours from the chunk data
-        let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
-                                                // Adjust origin based on chunk position
-                                                .x_origin(chunk.pos_x * chunk_width)
-                                                .y_origin(chunk.pos_y * chunk_height)
-                                                .x_step(1.0)
-                                                .y_step(1.0);
-        let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
-
-        // Simplify and triangulate each contours
-        for contour in contours {
-            // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
-            // RDP seems to be much faster generally
-            let geometry = contour.geometry().simplify(&1.5);
-
-            for poly in geometry {
-                // Triangulate the polygon using the earcut algorithm and place into collider
-                let triangles = poly.earcut_triangles();
-                for triangle in triangles {
-                    let collider = Collider::triangle(
-                        vec2(triangle.0.x as f32, triangle.0.y as f32),
-                        vec2(triangle.1.x as f32, triangle.1.y as f32),
-                        vec2(triangle.2.x as f32, triangle.2.y as f32),
-                    );
-
-                    colliders.push((Vec2::ZERO, 0.0, collider));
-                }
-            }
-        }
-        if !colliders.is_empty() {
-            // Combine all colliders into a single collider
-            let combined = Collider::compound(colliders);
-            let id = commands.spawn(combined).id();
-            rigid_storage.colliders[i] = Some(vec![id]);
-        } else {
-            rigid_storage.colliders[i] = None;
-        }
-    }
+    // Cells occupied by the entity in world space
+    pub cells: Vec<(u32, u32)>,
 }
 
-// Remove colliders inside a chunk
-pub fn cleanup_colliders(
-    rigid_storage: &mut ResMut<RigidStorage>,
-    i: usize,
-    commands: &mut Commands,
+#[derive(Resource)]
+pub struct RigidBodyImageHandle {
+    pub handle: Option<Handle<Image>>,
+}
+
+pub fn load_rigidbody_image(
+    server: Res<AssetServer>,
+    mut rigidbody_image: ResMut<RigidBodyImageHandle>,
 ) {
-    if let Some(colliders) = &rigid_storage.colliders[i] {
-        for entity in colliders.iter() {
-            commands.entity(*entity).despawn();
+    let image_handle = server.load("box.png");
+    rigidbody_image.handle = Some(image_handle);
+}
+
+// Add a single rigidbody to the world
+pub fn add_rigidbody(
+    mut commands: Commands,
+    images: Res<Assets<Image>>,
+    rigidbody_image: Res<RigidBodyImageHandle>,
+    position: Vec2,
+) {
+    let image_handle = rigidbody_image.handle.clone().unwrap();
+    let image = images.get(&image_handle).unwrap();
+
+    let values = image_valuemap(&image);
+    let collider = create_collider(&values, image.width(), image.height()).unwrap();
+    
+    // Create entity
+    commands.spawn((
+        // Collider constructed from image
+        collider,
+        // This is a rigidbody
+        RigidBody::Dynamic,
+        // Soft Continuous Collision Detection (CCD) to prevent tunneling
+        // Soft CCD is cheaper than CCD using prediction
+        SoftCcd {
+            prediction: 15.0,
+        },
+        // Image that the rigidbody is based on
+        SpriteBundle {
+            texture: image_handle.clone(),
+            sprite: Sprite {
+                anchor: Anchor::BottomLeft,
+                ..Default::default()
+            },
+            transform: Transform::from_translation(Vec3::new(position.x, position.y, 0.0)),
+            ..Default::default()
+        },
+    ));
+}
+
+// Gets values to be used in the contour builder from the image based on the image's pixel values
+fn image_valuemap(image: &Image) -> Vec<f64> {
+    let mut values: Vec<f64> = Vec::new();
+    for p in image.data.chunks_exact(4) {
+        // If the pixel is not transparent, add it to the values
+        if p[3] > 0 {
+            values.push(1.0);
+        } else {
+            values.push(0.0);
         }
     }
-    rigid_storage.colliders[i] = None;
+
+    values
 }
