@@ -37,8 +37,7 @@ pub fn generate_colliders(
         // Simplify and triangulate each contours
         for contour in contours {
             // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
-            // RDP seems to be much faster generally
-            let geometry = contour.geometry().simplify(&1.5);
+            let geometry = contour.geometry().simplify_vw_preserve(&1.5);
 
             for poly in geometry {
                 // Triangulate the polygon using the earcut algorithm and place into collider
