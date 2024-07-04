@@ -1,5 +1,6 @@
-mod rigidbodies;
+mod collider_generation;
 mod character_control_tnua;
+mod rigidbodies;
 
 use std::f32::consts::FRAC_PI_4;
 
@@ -9,7 +10,10 @@ use bevy_rapier2d::prelude::*;
 use bevy_tnua::{builtins::{TnuaBuiltinCrouch, TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{TnuaCrouchEnforcer, TnuaCrouchEnforcerPlugin, TnuaSimpleAirActionsCounter}, controller::{TnuaControllerBundle, TnuaControllerPlugin}, math::Vector3, TnuaGhostSensor, TnuaToggle, TnuaUserControlsSystemSet};
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
-use rigidbodies::generate_colliders;
+use collider_generation::generate_colliders;
+use rigidbodies::{add_rigidbody, load_rigidbody_image, RigidBodyImageHandle};
+
+use crate::debug_ui::DebugInfo;
 
 use super::CHUNKS;
 
@@ -18,9 +22,9 @@ pub struct SandEngineRigidPlugin;
 impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(RigidStorage::default())
-            .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.).in_fixed_schedule())
+            .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
             .add_plugins(RapierDebugRenderPlugin::default())
-            .add_systems(FixedFirst, generate_colliders)
+            .add_systems(FixedUpdate, generate_colliders)
             .add_plugins((
                 TnuaRapier2dPlugin::new(FixedUpdate),
                 TnuaControllerPlugin::new(FixedUpdate),
@@ -31,6 +35,11 @@ impl Plugin for SandEngineRigidPlugin {
             .add_systems(Startup, |mut cfg: ResMut<RapierConfiguration>| {
                 cfg.gravity = Vec2::Y * -9.81;
             })
+            .insert_resource(RigidBodyImageHandle {
+                handle: None,
+            })
+            .add_systems(Startup, load_rigidbody_image)
+            .add_systems(Update, mouse_input_spawn_rigidbody)
             .add_systems(
                 FixedUpdate.intern(),
                 apply_platformer_controls.in_set(TnuaUserControlsSystemSet),
@@ -41,13 +50,17 @@ impl Plugin for SandEngineRigidPlugin {
 // RigidStorage is a resource that stores a vector for each chunk that contains the entities of the colliders in that chunk
 #[derive(Resource)]
 pub struct RigidStorage {
+    // Static colliders generated from the pixel simulation
     pub colliders: Vec<Option<Vec<Entity>>>,
+    // Dynamic colliders that interact with the pixel simulation
+    pub rigidbodies: Vec<Entity>,
 }
 
 impl Default for RigidStorage {
     fn default() -> Self {
         Self {
-            colliders: vec![None; CHUNKS.0 as usize * CHUNKS.1 as usize]
+            colliders: vec![None; CHUNKS.0 as usize * CHUNKS.1 as usize],
+            rigidbodies: vec![],
         }
     }
 }
@@ -158,4 +171,17 @@ fn setup_player(mut commands: Commands) {
     // need to cast a shape - which is physics-engine specific. We set the shape using a
     // component.
     cmd.insert(TnuaRapier2dSensorShape(Collider::ball(0.70)));
+}
+
+fn mouse_input_spawn_rigidbody(
+    commands: Commands,
+    mouse_button_input: Res<ButtonInput<MouseButton>>,
+    dbg_info: ResMut<DebugInfo>,
+
+    rigidbody_image: Res<RigidBodyImageHandle>,
+    images: Res<Assets<Image>>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Right) {
+        add_rigidbody(commands, images, rigidbody_image, dbg_info.position);
+    }
 }

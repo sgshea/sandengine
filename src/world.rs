@@ -148,7 +148,6 @@ impl PixelWorld {
             chunk.cells.iter_mut().for_each(|cell| {
                 cell.updated = 0;
             });
-            // chunk.cells = chunk.next_cells.clone();
         });
         self.iteration += 1;
     }
