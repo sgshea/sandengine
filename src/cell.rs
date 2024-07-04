@@ -38,6 +38,16 @@ impl Cell {
         }
     }
 
+    pub fn special() -> Self {
+        Self {
+            cell_type: StateType::Special,
+            cell_color: CellType::Empty.cell_color(),
+            cell_movement: DirectionType::NONE,
+            velocity: Vec2::new(0.0, 0.0),
+            updated: 0,
+        }
+    }
+
     pub fn get_movement(&self) -> DirectionType {
         self.cell_movement
     }

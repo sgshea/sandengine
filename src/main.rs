@@ -31,7 +31,8 @@ fn main() {
                     present_mode: PresentMode::AutoVsync,
                     ..default()
                 }),
-                ..default()}),
+                ..default()}
+            ).set(ImagePlugin::default_nearest()),
             DefaultPickingPlugins,
             EguiPlugin
         ))
