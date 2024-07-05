@@ -52,30 +52,9 @@ impl PixelWorld {
         (x / self.c_width, y / self.c_height)
     }
 
-    pub fn get_chunk(&self, x: i32, y: i32) -> &PixelChunk {
-        let (cx, cy) = self.get_chunk_location(x, y);
-        self.chunks_lookup.get(&(cx, cy)).unwrap()
-    }
-
     fn create_chunk(&mut self, x: i32, y: i32) {
         let chunk = PixelChunk::new(self.c_width, self.c_height, x, y);
         self.chunks_lookup.insert((x, y), chunk);
-    }
-
-    pub fn in_bounds(&self, x: i32, y: i32) -> bool {
-        x >= 0 && x < self.c_width * self.chunks_x && y >= 0 && y < self.c_height * self.chunks_y
-    }
-
-    pub fn chunk_to_world_coords(&self, chunk_pos: (i32, i32), cell_pos: (i32, i32)) -> (i32, i32) {
-        (chunk_pos.0 * self.c_width + cell_pos.0, chunk_pos.1 * self.c_height + cell_pos.1)
-    }
-
-    pub fn inside_chunk(&self, chunk: &PixelChunk, world_coord: (i32, i32)) -> bool {
-        (chunk.pos_x, chunk.pos_y) == self.get_chunk_location(world_coord.0, world_coord.1)
-    }
-
-    pub fn chunk_exists_at_world_coord(&self, x: i32, y: i32) -> bool {
-        self.chunks_lookup.contains_key(&self.get_chunk_location(x, y))
     }
 
     pub fn get_cell(&self, x: i32, y: i32) -> Option<&Cell> {

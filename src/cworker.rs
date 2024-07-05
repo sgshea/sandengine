@@ -406,45 +406,6 @@ impl<'a> ChunkWorker<'a> {
         self.apply_force(idx, DirectionType::DOWN, 1.);
     }
 
-    // Adds some sideways velocity to simulate liquid movement
-    fn liquid_movement(&mut self, idx: &WorkerIndex) {
-        let cell = &self.chunk.cells[idx.idx];
-        let down_density = self.get_other_cell(&idx, DirectionType::DOWN).map(|t| t.get_density()).unwrap_or(1000.);
-        let cell_density = cell.get_density();
-        if down_density >= cell_density && cell.velocity.x.abs() <= 7. {
-            let left = self.get_other_cell(&idx, DirectionType::LEFT);
-            let right = self.get_other_cell(&idx, DirectionType::RIGHT);
-            // get types and make sure they are empty and has not been updated
-            let mut move_left = cell.velocity.x < 0.;
-            let mut move_right = cell.velocity.x > 0.;
-            if !move_left && !move_right {
-                // operate on density
-                move_left = left.is_some_and(|t| t.get_density() < cell_density);
-                move_right = right.is_some_and(|t| t.get_density() < cell_density);
-
-                if move_left && move_right {
-                    // choose 50/50
-                    move_left = rand::thread_rng().gen_bool(0.5);
-                    move_right = !move_left;
-                }
-            }
-
-            let acceleration = 0.4;
-            let cell = &mut self.chunk.cells[idx.idx];
-            if move_right {
-                if cell.velocity.x < 0. {
-                    cell.velocity.x = 0.;
-                }
-                cell.velocity.x += acceleration;
-            } else if move_left {
-                if cell.velocity.x > 0. {
-                    cell.velocity.x = 0.;
-                }
-                cell.velocity.x -= acceleration;
-            }
-        }
-    }
-
     fn apply_velocity(&mut self, idx: &WorkerIndex) -> bool {
         let cell = &mut self.chunk.cells[idx.idx];
         let cell_density = cell.get_density();
@@ -650,7 +611,8 @@ mod tests {
 
         let test_worker = ChunkWorker::new_from_chunk_ref(&(1, 1), &mut current_references, true);
 
-        assert_eq!(test_worker.chunk.get_pos(), (1, 1));
+        let pos = (test_worker.chunk.pos_x, test_worker.chunk.pos_y);
+        assert_eq!(pos, (1, 1));
         // Bottom left corner chunk
         let pos_1= test_worker.get_worker_index(-1, -1);
         assert_eq!(pos_1.chunk_rel, (-1, -1));

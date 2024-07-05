@@ -43,6 +43,7 @@ pub fn add_rigidbody(
 
     let values = image_valuemap(&image);
     let collider = create_collider(&values, image.width(), image.height()).unwrap();
+    // let collider = Collider::cuboid(8., 8.);
     
     // Create entity
     commands.spawn((
@@ -55,6 +56,7 @@ pub fn add_rigidbody(
         SoftCcd {
             prediction: 15.0,
         },
+        Restitution::coefficient(0.7),
         // Image that the rigidbody is based on
         SpriteBundle {
             texture: image_handle.clone(),
