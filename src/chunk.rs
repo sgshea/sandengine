@@ -31,10 +31,6 @@ impl PixelChunk {
         s
     }
 
-    pub fn get_pos(&self) -> (i32, i32) {
-        (self.pos_x, self.pos_y)
-    }
-
     pub fn get_index(&self, x: i32, y: i32) -> usize {
         // world to chunk coord
         let x = x % self.width;
@@ -43,42 +39,10 @@ impl PixelChunk {
         (y * self.width + x) as usize
     }
 
-    fn in_bounds(&self, x: i32, y: i32) -> bool {
-        x >= 0 && x < self.width && y >= 0 && y < self.height
-    }
-
-    pub fn in_bounds_world(&self, x: i32, y: i32) -> bool {
-        let idx = self.get_index(x, y);
-        idx < self.cells.len()
-    }
-
-    pub fn is_empty(&self, x: i32, y: i32) -> bool {
-        let idx = self.get_index(x, y);
-        idx < self.cells.len() && self.cells[idx].get_type() == CellType::Empty
-    }
-
-    pub fn get_cell(&self, idx: usize) -> &Cell {
-        &self.cells[idx]
-    }
-
     pub fn get_cell_2d(&self, x: i32, y: i32) -> &Cell {
         let idx = self.get_index(x, y);
         if idx < self.cells.len() {
             &self.cells[idx]
-        } else {
-            println!("Index out of bounds: {} {} {}", x, y, idx);
-            panic!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
-        }
-    }
-
-    pub fn get_cell_mut(&mut self, idx: usize) -> &mut Cell {
-        &mut self.cells[idx]
-    }
-
-    pub fn get_cell_mut_2d(&mut self, x: i32, y: i32) -> &mut Cell {
-        let idx = self.get_index(x, y);
-        if idx < self.cells.len() {
-            &mut self.cells[idx]
         } else {
             println!("Index out of bounds: {} {} {}", x, y, idx);
             panic!("Chunk: {} {} {} {}", self.pos_x, self.pos_y, self.width, self.height);
@@ -95,12 +59,6 @@ impl PixelChunk {
     pub fn set_cell(&mut self, x: i32, y: i32, cell: Cell) {
         let idx = self.get_index(x, y);
         self.set_cell_1d(idx, cell);
-    }
-
-    pub fn set_cell_checked(&mut self, x: i32, y: i32, cell: Cell) {
-        if self.in_bounds(x, y) {
-            self.set_cell(x, y, cell);
-        }
     }
 
     pub fn cells_as_floats(&self) -> Vec<f64> {
