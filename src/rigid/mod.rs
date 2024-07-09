@@ -71,7 +71,6 @@ fn setup_physics_environment(mut commands: Commands) {
     cmd.insert(SpriteBundle {
         sprite: Sprite {
             custom_size: Some(Vec2::new(128.0, 0.5)),
-            color: Color::GRAY,
             ..Default::default()
         },
         ..Default::default()
