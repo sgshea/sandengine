@@ -176,7 +176,7 @@ pub fn draw_chunk_gizmos(
             ),
             0.0,
             Vec2::new(CHUNK_SIZE.0 as f32, CHUNK_SIZE.1 as f32),
-            Color::rgba(0.0, 1.0, 0.0, 0.5),
+            Color::srgba(0.0, 1.0, 0.0, 0.5),
         );
     }
 }
