@@ -7,17 +7,17 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = { version = "0.13.0", features = ["dynamic_linking"] }
-bevy_mod_picking = { version = "0.19.0", default-features = false, features = ["backend_egui", "backend_sprite"] }
+bevy = { version = "0.14.0", features = ["dynamic_linking"] }
+bevy_mod_picking = { version = "0.20.0", default-features = false, features = ["backend_egui", "backend_sprite"] }
 # bevy_egui = "0.24.0" # bevy_egui is re-exported by bevy_mod_picking
 
 bitflags = "2.4.2"
 rand = "0.8.5"
 strum = { version="0.26.1", features=["derive"] }
 
-bevy_rapier2d = { version = "0.26", features = [ "debug-render-2d" ] }
-bevy-tnua-rapier2d = "0.6.0"
-bevy-tnua = "0.18.0"
+bevy_rapier2d = { version = "0.27", features = [ "debug-render-2d" ] }
+bevy-tnua-rapier2d = "0.7.0"
+bevy-tnua = "0.19.0"
 
 # Marching squares algorithm
 contour = "0.13.1"
