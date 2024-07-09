@@ -41,14 +41,9 @@ pub fn generate_colliders(
 
             for poly in geometry {
                 // Triangulate the polygon using the earcut algorithm and place into collider
-                let triangles = poly.earcut_triangles();
-                for triangle in triangles {
-                    let collider = Collider::triangle(
-                        vec2(triangle.0.x as f32, triangle.0.y as f32),
-                        vec2(triangle.1.x as f32, triangle.1.y as f32),
-                        vec2(triangle.2.x as f32, triangle.2.y as f32),
-                    );
-
+                let triangles = convert_polygon_to_triangles(poly);
+                for triangle in triangles.chunks(3) {
+                    let collider = Collider::triangle(triangle[0], triangle[1], triangle[2]);
                     colliders.push((Vec2::ZERO, 0.0, collider));
                 }
             }
@@ -79,18 +74,13 @@ pub fn create_collider(values: &[f64], width: u32, height: u32) -> Option<Collid
         // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
         // RDP is faster but VW is better at preserving the shape (creating better colliders)
         // Higher epsilon values will simplify more (remove more points)
-        let geometry = contour.geometry().simplify_vw_preserve(&1.0);
+        let geometry = contour.geometry().simplify_vw_preserve(&1.5);
 
         for poly in geometry {
             // Triangulate the polygon using the earcut algorithm and place into collider
-            let triangles = poly.earcut_triangles();
-            for triangle in triangles {
-                let collider = Collider::triangle(
-                    vec2(triangle.0.x as f32, triangle.0.y as f32),
-                    vec2(triangle.1.x as f32, triangle.1.y as f32),
-                    vec2(triangle.2.x as f32, triangle.2.y as f32),
-                );
-
+            let triangles = convert_polygon_to_triangles(poly);
+            for triangle in triangles.chunks(3) {
+                let collider = Collider::triangle(triangle[0], triangle[1], triangle[2]);
                 colliders.push((Vec2::ZERO, 0.0, collider));
             }
         }
@@ -113,4 +103,15 @@ pub fn cleanup_colliders(
         }
     }
     rigid_storage.colliders[i] = None;
+}
+
+fn convert_polygon_to_triangles(polygon: geo::Polygon<f64>) -> Vec<Vec2> {
+    let mut tris = Vec::new();
+    let triangles = polygon.earcut_triangles();
+    for triangle in triangles {
+        tris.push(vec2(triangle.0.x as f32, triangle.0.y as f32));
+        tris.push(vec2(triangle.1.x as f32, triangle.1.y as f32));
+        tris.push(vec2(triangle.2.x as f32, triangle.2.y as f32));
+    }
+    tris
 }
