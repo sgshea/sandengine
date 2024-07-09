@@ -56,7 +56,10 @@ pub fn add_rigidbody(
         SoftCcd {
             prediction: 15.0,
         },
+        ColliderMassProperties::default(),
         Restitution::coefficient(0.7),
+        // Giving some contact skin helps prevent tunnelling, jittering, and issues of rigidbodies going inside each other
+        ContactSkin(0.5),
         // Image that the rigidbody is based on
         SpriteBundle {
             texture: image_handle.clone(),

@@ -51,7 +51,7 @@ pub fn generate_colliders(
         if !colliders.is_empty() {
             // Combine all colliders into a single collider
             let combined = Collider::compound(colliders);
-            let id = commands.spawn(combined).id();
+            let id = commands.spawn(combined).insert(ContactSkin(0.1)).id();
             rigid_storage.colliders[i] = Some(vec![id]);
         } else {
             rigid_storage.colliders[i] = None;
