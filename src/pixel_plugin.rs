@@ -1,5 +1,3 @@
-use std::time;
-
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
 
@@ -127,23 +125,14 @@ fn setup_pixel_simulation(
 
 fn update_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
-    mut dbg_info: ResMut<DebugInfo>,
 ) {
-    let start = time::Instant::now();
     query.single_mut().world.update();
-    let elapsed = start.elapsed().as_secs_f32();
-    dbg_info.sim_time.push(elapsed);
-    if dbg_info.sim_time.len() > 100 {
-        dbg_info.sim_time.remove(0);
-    }
 }
 
 fn render_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
     mut images: ResMut<Assets<Image>>,
-    mut dbg_info: ResMut<DebugInfo>,
 ) {
-    let start = time::Instant::now();
     for sim in query.iter_mut() {
         let image = images.get_mut(&sim.image_handle).unwrap();
         image.data.chunks_mut(4).enumerate().for_each(|(i, pixel)| {
@@ -153,10 +142,5 @@ fn render_pixel_simulation(
             let color = cell.get_color();
             pixel.copy_from_slice(color);
         });
-    }
-    let elapsed = start.elapsed().as_secs_f32();
-    dbg_info.render_construct_time.push(elapsed);
-    if dbg_info.render_construct_time.len() > 100 {
-        dbg_info.render_construct_time.remove(0);
     }
 }

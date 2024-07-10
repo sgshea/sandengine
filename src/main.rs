@@ -10,8 +10,7 @@ mod rigid;
 mod debug_ui;
 
 use bevy::{prelude::*, window::{PresentMode, WindowResized}};
-use bevy_mod_picking::{backends::egui::bevy_egui, prelude::*};
-// bevy_egui re-exported from bevy_mod_picking
+use bevy_mod_picking::prelude::*;
 use bevy_egui::EguiPlugin;
 use debug_ui::{cell_selector_ui, egui_ui, keyboard_debug, ChunkGizmos, DebugInfo};
 use pixel_plugin::PixelPlugin;
