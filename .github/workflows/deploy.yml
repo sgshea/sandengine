@@ -23,9 +23,9 @@ jobs:
       run: just build-wasm
 
     - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ env.BUILD_PATH }}/wasm
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ${{ env.BUILD_PATH }}/wasm
   
   deploy:
     if: github.ref == 'refs/heads/main'
