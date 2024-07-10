@@ -8,7 +8,9 @@ pub struct Cell {
     cell_color: [u8; 4],
     cell_movement: DirectionType, // Direction of cell movement (can have multiple)
     cell_type: StateType, // Type of cell
-    velocity: Vec2,
+    pub velocity: Vec2,
+
+    pub updated: u8,
 }
 
 impl Cell {
@@ -21,6 +23,7 @@ impl Cell {
             cell_color,
             cell_movement: dtype,
             velocity: Vec2::new(0.0, 0.0),
+            updated: 0,
         }
     }
 
@@ -31,6 +34,17 @@ impl Cell {
             cell_color: CellType::Empty.cell_color(),
             cell_movement: DirectionType::NONE,
             velocity: Vec2::new(0.0, 0.0),
+            updated: 0,
+        }
+    }
+
+    pub fn special() -> Self {
+        Self {
+            cell_type: StateType::Special,
+            cell_color: CellType::Empty.cell_color(),
+            cell_movement: DirectionType::NONE,
+            velocity: Vec2::new(0.0, 0.0),
+            updated: 0,
         }
     }
 
@@ -49,6 +63,7 @@ impl Cell {
             StateType::HardSolid(ctype) => ctype,
             StateType::Liquid(ctype) => ctype,
             StateType::Gas(ctype) => ctype,
+            StateType::Special => CellType::Empty,
         }
     }
 
@@ -73,6 +88,14 @@ impl From<CellType> for Cell {
                  DirectionType::NONE),
             CellType::Water => Self::new(CellType::Water,
                  DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT),
+            CellType::Smoke => Self::new(CellType::Smoke,
+                    DirectionType::UP | DirectionType::UP_LEFT | DirectionType::UP_RIGHT),
         }
+    }
+}
+
+impl Default for Cell {
+    fn default() -> Self {
+        Self::empty()
     }
 }

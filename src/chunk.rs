@@ -1,7 +1,3 @@
-use std::{mem, sync::{Arc, Mutex}};
-
-use rand::Rng;
-
 use crate::{cell::Cell, cell_types::CellType};
 
 #[derive(Debug, Clone)]
@@ -13,8 +9,6 @@ pub struct PixelChunk {
     pub pos_y: i32,
 
     pub cells: Vec<Cell>,
-
-    pub changes: Vec<(Option<Arc<Mutex<PixelChunk>>>, usize, usize)>,
 
     pub awake: bool,
     pub awake_next: bool,
@@ -30,16 +24,11 @@ impl PixelChunk {
             pos_x,
             pos_y,
             cells,
-            changes: Vec::new(),
             awake: true,
             awake_next: true,
         };
         
         s
-    }
-
-    pub fn get_pos(&self) -> (i32, i32) {
-        (self.pos_x, self.pos_y)
     }
 
     pub fn get_index(&self, x: i32, y: i32) -> usize {
@@ -48,24 +37,6 @@ impl PixelChunk {
         let y = y % self.height;
 
         (y * self.width + x) as usize
-    }
-
-    fn in_bounds(&self, x: i32, y: i32) -> bool {
-        x >= 0 && x < self.width && y >= 0 && y < self.height
-    }
-
-    pub fn in_bounds_world(&self, x: i32, y: i32) -> bool {
-        let idx = self.get_index(x, y);
-        idx < self.cells.len()
-    }
-
-    pub fn is_empty(&self, x: i32, y: i32) -> bool {
-        let idx = self.get_index(x, y);
-        idx < self.cells.len() && self.cells[idx].get_type() == CellType::Empty
-    }
-
-    pub fn get_cell(&self, idx: usize) -> &Cell {
-        &self.cells[idx]
     }
 
     pub fn get_cell_2d(&self, x: i32, y: i32) -> &Cell {
@@ -90,44 +61,195 @@ impl PixelChunk {
         self.set_cell_1d(idx, cell);
     }
 
-    pub fn set_cell_checked(&mut self, x: i32, y: i32, cell: Cell) {
-        if self.in_bounds(x, y) {
-            self.set_cell(x, y, cell);
-        }
+    pub fn cells_as_floats(&self) -> Vec<f64> {
+        // Map each cell to a float depending on if it is solid
+        // range 0.0-1.0
+
+        self.cells.iter().map(|cell| {
+            if cell.get_type() == CellType::Empty {
+                0.0
+            } else {
+                1.0
+            }
+        }).collect::<Vec<f64>>()
     }
+}
 
-    fn swap_cells_diff_chunk(&mut self, src: usize, dst: usize, chunk: Arc<Mutex<PixelChunk>>) {
-        let mut chunk = chunk.lock().unwrap();
-        mem::swap(&mut self.cells[dst], &mut chunk.cells[src]);
-    }
+fn split_top_bottom_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+    let mid = cells.len() / 2;
+    let (top, bottom) = cells.split_at_mut(mid);
+    (top.iter_mut().collect(), bottom.iter_mut().collect())
+}
 
-    fn swap_cells(&mut self, src: usize, dst: usize) {
-        self.cells.swap(src, dst);
-    }
+fn split_left_right_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>) {
+    let side_length = (cells.len() as f64).sqrt() as usize;
+    let half = side_length / 2;
+    let mut cells_l = Vec::new();
+    let mut cells_r = Vec::new();
 
-    pub fn commit_cells(&mut self) {
-        // Sort by destination
-        self.changes.sort_by(|a, b| a.2.cmp(&b.2));
+    for i in 0..side_length {
+        let start = i * side_length;
+        let ptr = cells.as_mut_ptr();
 
-        // Iterate over sorted moves and pick random source to move from each time
-        let mut iprev = 0;
-        for i in 0..self.changes.len() {
-            if i == self.changes.len() - 1 || self.changes[i + 1].2 != self.changes[i].2 {
-                let rand = iprev + rand::thread_rng().gen_range(0..=(i - iprev));
-
-                let dst = self.changes[rand].2;
-                let src = self.changes[rand].1;
-                match &self.changes[rand].0 {
-                    Some(chunk) => {
-                        self.swap_cells_diff_chunk(src, dst, chunk.clone());
-                    },
-                    None => {
-                        self.swap_cells(src, dst);
-                    }
-                }
-                iprev = i + 1;
+        // UNSAFE
+        // This is unsafe because it uses raw pointers and could possibly create invalid slices
+        // This is safe because cells is guaranteed to exist, and all elements are initialized
+        // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_l.push(cell);
             }
         }
-        self.changes.clear();
+    }
+    for i in 0..side_length {
+        let start = i * side_length + half;
+        let ptr = cells.as_mut_ptr();
+
+        // UNSAFE
+        // This is unsafe because it uses raw pointers and could possibly create invalid slices
+        // This is safe because cells is guaranteed to exist, and all elements are initialized
+        // The slice will be valid and always is within the bounds of the original data, and not overlapping with other slices
+        // Playground demonstration: https://gist.github.com/rust-play/00f1c05433719be6dc3add0b8c10df14
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_r.push(cell);
+            }
+        }
+    }
+
+    (cells_l, cells_r)
+}
+
+fn split_corner_cells(cells: &mut Vec<Cell>) -> (Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>, Vec<&mut Cell>) {
+    let side_length = (cells.len() as f64).sqrt() as usize;
+    // Get top and bottom
+    let mid = cells.len() / 2;
+    let (top, bottom) = cells.split_at_mut(mid);
+
+    // Get left and right from top
+    let half = side_length / 2;
+    let mut cells_tl = Vec::new();
+    let mut cells_tr = Vec::new();
+
+    for i in 0..half {
+        let start = i * side_length;
+        let ptr = top.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_tl.push(cell);
+            }
+        }
+    }
+    for i in 0..half {
+        let start = i * side_length + half;
+        let ptr = top.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_tr.push(cell);
+            }
+        }
+    }
+
+    // Get left and right from bottom
+    let mut cells_bl = Vec::new();
+    let mut cells_br = Vec::new();
+
+    for i in 0..half {
+        let start = i * side_length;
+        let ptr = bottom.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_bl.push(cell);
+            }
+        }
+    }
+    for i in 0..half {
+        let start = i * side_length + half;
+        let ptr = bottom.as_mut_ptr();
+
+        unsafe {
+            let slice = std::slice::from_raw_parts_mut(ptr.add(start), half);
+            for cell in slice {
+                cells_br.push(cell);
+            }
+        }
+    }
+
+    (cells_tl, cells_tr, cells_bl, cells_br)
+}
+
+pub enum SplitChunk<'a> {
+    Entire(&'a mut PixelChunk),
+
+    TopBottom([Option<Vec<&'a mut Cell>>; 2]),
+
+    LeftRight([Option<Vec<&'a mut Cell>>; 2]),
+
+    Corners([Option<Vec<&'a mut Cell>>; 4]),
+}
+
+impl SplitChunk<'_> {
+    // Borrowing cells from the chunk
+    pub fn from_chunk(chunk: &mut PixelChunk) -> SplitChunk {
+        SplitChunk::Entire(chunk)
+    }
+
+    pub fn from_chunk_vert(chunk: &mut PixelChunk) -> SplitChunk {
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
+        SplitChunk::TopBottom([Some(top), Some(bottom)])
+    }
+
+    pub fn from_chunk_side(chunk: &mut PixelChunk) -> SplitChunk {
+        let (left, right) = split_left_right_cells(&mut chunk.cells);
+        SplitChunk::LeftRight([Some(left), Some(right)])
+    }
+
+    pub fn from_chunk_corners(chunk: &mut PixelChunk) -> SplitChunk {
+        let (tl, tr, bl, br) = split_corner_cells(&mut chunk.cells);
+        SplitChunk::Corners([Some(tl), Some(tr), Some(bl), Some(br)])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_top_bottom_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (top, bottom) = split_top_bottom_cells(&mut chunk.cells);
+        assert_eq!(top.len(), 128);
+        assert_eq!(bottom.len(), 128);
+    }
+
+    #[test]
+    fn test_split_left_right_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (left, right) = split_left_right_cells(&mut chunk.cells);
+        assert_eq!(left.len(), 128);
+        assert_eq!(right.len(), 128);
+    }
+
+    #[test]
+    fn test_split_corner_cells() {
+        let mut chunk = PixelChunk::new(16, 16, 0, 0);
+
+        let (top_left, top_right, bottom_left, bottom_right) = split_corner_cells(&mut chunk.cells);
+        // each should be 8x8
+
+        assert_eq!(top_left.len(), 64);
+        assert_eq!(top_right.len(), 64);
+        assert_eq!(bottom_left.len(), 64);
+        assert_eq!(bottom_right.len(), 64);
     }
 }

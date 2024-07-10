@@ -2,16 +2,20 @@ use bitflags::bitflags;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
-// Maximum density of a cell
-const MAX_DENSITY: f32 = 100.0;
-
-#[derive(Clone, Copy, PartialEq, Debug, EnumIter, VariantNames)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
 pub enum CellType {
     Empty,
     Sand,
     Dirt,
     Stone,
     Water,
+    Smoke,
+}
+
+impl Default for CellType {
+    fn default() -> Self {
+        CellType::Empty
+    }
 }
 
 impl CellType {
@@ -19,21 +23,11 @@ impl CellType {
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
-            CellType::Sand => 40.0,
-            CellType::Dirt => 70.0,
+            CellType::Sand => 60.0,
+            CellType::Dirt => 60.0,
             CellType::Stone => 100.0,
-            CellType::Water => 30.0,
-        }
-    }
-
-    // Inertia is how likely a cell will choose to stay in place (not look sideways for a new cell to move to)
-    pub fn cell_inertia(&self) -> f32 {
-        match self {
-            CellType::Empty => 0.0,
-            CellType::Sand => 0.5,
-            CellType::Dirt => 0.65,
-            CellType::Stone => 0.9,
-            CellType::Water => 0.1,
+            CellType::Water => 50.0,
+            CellType::Smoke => 10.0,
         }
     }
 
@@ -73,38 +67,34 @@ impl CellType {
                     150,
                 ]
             },
+            CellType::Smoke => {
+                [
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    (192 + trng.gen_range(-20..20)) as u8,
+                    150,
+                ]
+            },
         }
     }
 }
 
-// Computes a chance to move based on differing densities of cells
-// If the density of the cell we're moving from is greater than the density of the cell we're moving to,
-// then we have a chance to move based on the difference in densities
-//
-// Basically: the greater the difference in densities, the faster a cell will move through another cell
-pub fn should_move_density(density_from: f32, density_to: f32) -> bool {
-    if density_from < density_to {
-        return false;
-    }
-
-    let density_diff = density_from - density_to;
-    let move_probability = density_diff.abs() / MAX_DENSITY;
-
-    let mut trng = rand::thread_rng();
-    let random_number: f32 = trng.gen_range(0.0..1.0);
-
-    random_number < move_probability
-}
-
 // What kind of cell state is it?
 // Used to determine simple behaviors, but allows access to a more specific CellType
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
 pub enum StateType {
     Empty(CellType),
     SoftSolid(CellType), // Soft solid, like sand that can move
     HardSolid(CellType), // Hard solid, like stone that can't move
     Liquid(CellType),
     Gas(CellType),
+    Special, // Special markers that don't fit into the above categories, for now used for rigid bodies
+}
+
+impl Default for StateType {
+    fn default() -> Self {
+        StateType::Empty(CellType::Empty)
+    }
 }
 
 impl From<CellType> for StateType {
@@ -115,6 +105,7 @@ impl From<CellType> for StateType {
             CellType::Dirt => StateType::SoftSolid(ctype),
             CellType::Stone => StateType::HardSolid(ctype),
             CellType::Water => StateType::Liquid(ctype),
+            CellType::Smoke => StateType::Gas(ctype),
         }
     }
 }
