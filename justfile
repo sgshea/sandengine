@@ -35,4 +35,6 @@ run-server:
     cd wasm && http
 
 # Full build and run sequence
-build-and-run: clean compile-wasm generate-js move-files run-server
+build-wasm: clean compile-wasm generate-js move-files optimize-wasm
+
+build-and-run-wasm: build-wasm run-server
