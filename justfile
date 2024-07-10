@@ -6,6 +6,7 @@ run:
 
 # Install dependencies
 install-deps:
+    rustup target add wasm32-unknown-unknown
     cargo install wasm-bindgen-cli
     RUSTC_BOOTSTRAP=1 cargo install --git https://github.com/thecoshman/http
 
