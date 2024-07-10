@@ -1,11 +1,15 @@
-use std::time;
+pub mod world;
+mod chunk;
+mod cworker;
+pub mod cell;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
 
-use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
+use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, pixel::world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
 
 pub struct PixelPlugin;
+
 impl Plugin for PixelPlugin {
     fn build(&self, app: &mut App) {
         app
@@ -17,14 +21,14 @@ impl Plugin for PixelPlugin {
                 (update_pixel_simulation, render_pixel_simulation)
                 .chain()
                 .distributive_run_if(in_state(AppState::Running)),
-            )
-            .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
+            );
+            // .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
 
     }
 }
 
 #[derive(Component)]
-pub struct PixelSimulation {
+pub(crate) struct PixelSimulation {
     pub world: PixelWorld,
     pub image_handle: Handle<Image>,
 }
@@ -127,36 +131,22 @@ fn setup_pixel_simulation(
 
 fn update_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
-    mut dbg_info: ResMut<DebugInfo>,
 ) {
-    let start = time::Instant::now();
     query.single_mut().world.update();
-    let elapsed = start.elapsed().as_secs_f32();
-    dbg_info.sim_time.push(elapsed);
-    if dbg_info.sim_time.len() > 100 {
-        dbg_info.sim_time.remove(0);
-    }
 }
 
 fn render_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
     mut images: ResMut<Assets<Image>>,
-    mut dbg_info: ResMut<DebugInfo>,
 ) {
-    let start = time::Instant::now();
     for sim in query.iter_mut() {
         let image = images.get_mut(&sim.image_handle).unwrap();
         image.data.chunks_mut(4).enumerate().for_each(|(i, pixel)| {
             let x = i as i32 % WORLD_SIZE.0;
             let y = i as i32 / WORLD_SIZE.0;
             let cell = sim.world.get_cell(x, y).expect("Cell out of bounds");
-            let color = cell.get_color();
+            let color = &cell.color;
             pixel.copy_from_slice(color);
         });
-    }
-    let elapsed = start.elapsed().as_secs_f32();
-    dbg_info.render_construct_time.push(elapsed);
-    if dbg_info.render_construct_time.len() > 100 {
-        dbg_info.render_construct_time.remove(0);
     }
 }

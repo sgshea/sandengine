@@ -1,4 +1,4 @@
-use crate::{cell::Cell, cell_types::CellType};
+use super::cell::{Cell, PhysicsType};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
@@ -16,7 +16,7 @@ pub struct PixelChunk {
 
 impl PixelChunk {
     pub fn new(width: i32, height: i32, pos_x: i32, pos_y: i32) -> Self {
-        let cells = vec![Cell::empty(); (height * width) as usize];
+        let cells = vec![Cell::default(); (height * width) as usize];
 
         let s = PixelChunk {
             width,
@@ -66,7 +66,7 @@ impl PixelChunk {
         // range 0.0-1.0
 
         self.cells.iter().map(|cell| {
-            if cell.get_type() == CellType::Empty {
+            if cell.physics == PhysicsType::Empty {
                 0.0
             } else {
                 1.0

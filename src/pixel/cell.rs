@@ -1,15 +1,40 @@
 use bitflags::bitflags;
+use bevy::math::Vec2;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Cell {
+    pub color: [u8; 4],
+    pub velocity: Vec2,
+    pub updated: u8,
+
+    pub physics: PhysicsType,
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
-pub enum CellType {
+pub(crate) enum CellType {
     Empty,
     Sand,
     Dirt,
     Stone,
     Water,
     Smoke,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
+pub(crate) enum PhysicsType {
+    Empty,
+    // Soft solid, like sand that can move
+    SoftSolid(CellType),
+    // Hard solid, like stone that can't move
+    HardSolid(CellType),
+    // Liquid type such as water
+    Liquid(CellType),
+    // Gas type such as as smoke
+    Gas(CellType),
+    // Special case for rigid bodies which don't use cell physics but still contain cells
+    RigidBody(CellType),
 }
 
 impl Default for CellType {
@@ -19,7 +44,7 @@ impl Default for CellType {
 }
 
 impl CellType {
-    // Density is how likely a cell is to move through liquids
+        // Density is how likely a cell is to move through liquids
     pub fn cell_density(&self) -> f32 {
         match self {
             CellType::Empty => 0.0,
@@ -79,33 +104,73 @@ impl CellType {
     }
 }
 
-// What kind of cell state is it?
-// Used to determine simple behaviors, but allows access to a more specific CellType
-#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
-pub enum StateType {
-    Empty(CellType),
-    SoftSolid(CellType), // Soft solid, like sand that can move
-    HardSolid(CellType), // Hard solid, like stone that can't move
-    Liquid(CellType),
-    Gas(CellType),
-    Special, // Special markers that don't fit into the above categories, for now used for rigid bodies
-}
-
-impl Default for StateType {
+impl Default for PhysicsType {
     fn default() -> Self {
-        StateType::Empty(CellType::Empty)
+        PhysicsType::Empty
     }
 }
 
-impl From<CellType> for StateType {
+impl From<CellType> for PhysicsType {
     fn from(ctype: CellType) -> Self {
         match ctype {
-            CellType::Empty => StateType::Empty(ctype),
-            CellType::Sand => StateType::SoftSolid(ctype),
-            CellType::Dirt => StateType::SoftSolid(ctype),
-            CellType::Stone => StateType::HardSolid(ctype),
-            CellType::Water => StateType::Liquid(ctype),
-            CellType::Smoke => StateType::Gas(ctype),
+            CellType::Empty => PhysicsType::Empty,
+            CellType::Sand => PhysicsType::SoftSolid(ctype),
+            CellType::Dirt => PhysicsType::SoftSolid(ctype),
+            CellType::Stone => PhysicsType::HardSolid(ctype),
+            CellType::Water => PhysicsType::Liquid(ctype),
+            CellType::Smoke => PhysicsType::Gas(ctype),
+        }
+    }
+}
+
+impl PhysicsType {
+    pub fn density(&self) -> f32 {
+        match self {
+            PhysicsType::Empty => 0.0,
+            PhysicsType::SoftSolid(cell) => cell.cell_density(),
+            PhysicsType::HardSolid(cell) => cell.cell_density(),
+            PhysicsType::Liquid(cell) => cell.cell_density(),
+            PhysicsType::Gas(cell) => cell.cell_density(),
+            PhysicsType::RigidBody(cell) => cell.cell_density(),
+        }
+    }
+
+    pub fn direction(&self) -> DirectionType {
+        match self {
+            PhysicsType::Empty => DirectionType::empty(),
+            PhysicsType::SoftSolid(_) => DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT,
+            PhysicsType::HardSolid(_) => DirectionType::empty(),
+            PhysicsType::Liquid(_) => DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT,
+            PhysicsType::Gas(_) => DirectionType::UP | DirectionType::LEFT | DirectionType::RIGHT,
+            PhysicsType::RigidBody(_) => DirectionType::empty(),
+        }
+    }
+}
+
+impl Cell {
+    pub fn new(cell_type: CellType) -> Self {
+        Self {
+            color: cell_type.cell_color(),
+            velocity: Vec2::ZERO,
+            updated: 0,
+            physics: PhysicsType::from(cell_type),
+        }
+    }
+}
+
+impl From<CellType> for Cell {
+    fn from(value: CellType) -> Self {
+        Cell::new(value)
+    }
+}
+
+impl Default for Cell {
+    fn default() -> Self {
+        Self {
+            color: CellType::Empty.cell_color(),
+            velocity: Vec2::ZERO,
+            updated: 0,
+            physics: PhysicsType::Empty,
         }
     }
 }
@@ -113,7 +178,7 @@ impl From<CellType> for StateType {
 // Direction stored as bitflags
 bitflags! {
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub struct DirectionType: u32 {
+    pub(crate) struct DirectionType: u32 {
         const NONE = 0;
         const DOWN = 0b00000001;
         const DOWN_LEFT = 0b00000010;

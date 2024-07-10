@@ -3,7 +3,7 @@ use std::{fmt::Debug, mem};
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
+use super::{cell::{Cell, CellType, DirectionType, PhysicsType}, chunk::{PixelChunk, SplitChunk}};
 
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
@@ -42,21 +42,21 @@ impl<'a> ChunkWorker<'a> {
     }
 
     fn update_cell(&mut self, x: i32, y: i32) {
-        let state_type = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].get_state_type();
+        let state_type = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].physics;
         let updated = self.chunk.cells[get_index(x, y, self.chunk.width as i32)].updated;
         if updated == 1 {
             return;
         }
         match state_type {
-            StateType::Empty(_) => {
+            PhysicsType::Empty => {
                 // do nothing
                 return;
             },
-            StateType::SoftSolid(_) => {
+            PhysicsType::SoftSolid(_) => {
                 let idx = self.get_worker_index(x, y);
-                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-                let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-                let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+                let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+                let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
 
                 if down_empty && (!(down_left_empty || down_right_empty) || rand::thread_rng().gen_range(0..10) != 0) {
                     self.downward_fall(&idx);
@@ -64,19 +64,19 @@ impl<'a> ChunkWorker<'a> {
                     self.down_side(&idx);
                 }
             }
-            StateType::Liquid(_) => {
+            PhysicsType::Liquid(_) => {
                 let idx = self.get_worker_index(x, y);
 
-                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-                let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-                let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+                let down_empty = self.get_other_cell(&idx, DirectionType::DOWN).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+                let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+                let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
                 if down_empty && (!(left_empty || right_empty) || rand::thread_rng().gen_bool(0.95)) {
                     self.downward_fall(&idx);
                 } else {
                     self.sideways(&idx);
                 }
             }
-            StateType::Gas(_) => {
+            PhysicsType::Gas(_) => {
                 let idx = self.get_worker_index(x, y);
                 self.apply_force(&idx, DirectionType::UP, 1.);
                 if self.apply_velocity(&idx) {
@@ -102,7 +102,7 @@ impl<'a> ChunkWorker<'a> {
             (0, 0) => {
                 // If the cell has been updated, but is empty, give a small chance to still swap
                 if self.chunk.cells[c1.idx].updated == 1 ||
-                 (self.chunk.cells[c2.idx].updated == 1 && !matches!(self.chunk.cells[c2.idx].get_state_type(), StateType::Empty(_))
+                 (self.chunk.cells[c2.idx].updated == 1 && !matches!(self.chunk.cells[c2.idx].physics, PhysicsType::Empty)
                  && rand::thread_rng().gen_bool(0.1)) {
                     return false;
                 }
@@ -226,7 +226,7 @@ impl<'a> ChunkWorker<'a> {
         // are few below clear
         let empty_below = (0..4).all(|i| {
             let other_cell = self.get_cell(idx.x, idx.y - 2 - i);
-            other_cell.is_some() && matches!(other_cell.unwrap().get_state_type(), StateType::Empty(_))
+            other_cell.is_some() && matches!(other_cell.unwrap().physics, PhysicsType::Empty)
         });
 
         if empty_below {
@@ -234,7 +234,7 @@ impl<'a> ChunkWorker<'a> {
             return self.apply_velocity(idx);
         } else {
             // move 1 or 2 steps down
-            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x, idx.y - 2).is_some_and(|t| matches!(t.physics, PhysicsType::Empty)) {
                 let new_idx = self.get_worker_index(idx.x, idx.y - 2);
                 return self.swap_cells(idx, &new_idx);
             } else {
@@ -245,9 +245,9 @@ impl<'a> ChunkWorker<'a> {
     }
 
     fn down_side(&mut self, idx: &WorkerIndex) -> bool {
-        let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-        let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-        let above_empty = self.get_other_cell(&idx, DirectionType::UP).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+        let down_left_empty = self.get_other_cell(&idx, DirectionType::DOWN_LEFT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+        let down_right_empty = self.get_other_cell(&idx, DirectionType::DOWN_RIGHT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+        let above_empty = self.get_other_cell(&idx, DirectionType::UP).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
 
         // covered cells less likely to move down to sides
         if above_empty || rand::thread_rng().gen_bool(0.5) {
@@ -262,7 +262,7 @@ impl<'a> ChunkWorker<'a> {
                 return self.swap_cells(idx, &new_idx);
             } else if down_left_empty {
                 // chance to move down by 2
-                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 1, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 1, idx.y - 2).is_some_and(|t| matches!(t.physics, PhysicsType::Empty)) {
                     let new_idx = self.get_worker_index(idx.x - 1, idx.y - 2);
                     return self.swap_cells(idx, &new_idx);
                 } else {
@@ -271,7 +271,7 @@ impl<'a> ChunkWorker<'a> {
                 }
             } else if down_right_empty {
                 // chance to move down by 2
-                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 1, idx.y - 2).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+                if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 1, idx.y - 2).is_some_and(|t| matches!(t.physics, PhysicsType::Empty)) {
                     let new_idx = self.get_worker_index(idx.x + 1, idx.y - 2);
                     return self.swap_cells(idx, &new_idx);
                 } else {
@@ -284,8 +284,8 @@ impl<'a> ChunkWorker<'a> {
     }
 
     fn sideways(&mut self, idx: &WorkerIndex) -> bool {
-        let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
-        let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_)));
+        let left_empty = self.get_other_cell(&idx, DirectionType::LEFT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
+        let right_empty = self.get_other_cell(&idx, DirectionType::RIGHT).is_some_and(|t| matches!(t.physics, PhysicsType::Empty));
 
         if left_empty && right_empty {
             // choose 50/50
@@ -297,7 +297,7 @@ impl<'a> ChunkWorker<'a> {
                 return true;
             } return false;
         } else if left_empty {
-            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 2, idx.y).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x - 2, idx.y).is_some_and(|t| matches!(t.physics, PhysicsType::Empty)) {
                 let new_idx = self.get_worker_index(idx.x - 2, idx.y);
                 return self.swap_cells(idx, &new_idx);
             } else {
@@ -305,7 +305,7 @@ impl<'a> ChunkWorker<'a> {
                 return self.swap_cells(idx, &new_idx);
             }
         } else if right_empty {
-            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 2, idx.y).is_some_and(|t| matches!(t.get_state_type(), StateType::Empty(_))) {
+            if rand::thread_rng().gen_bool(0.5) && self.get_cell(idx.x + 2, idx.y).is_some_and(|t| matches!(t.physics, PhysicsType::Empty)) {
                 let new_idx = self.get_worker_index(idx.x + 2, idx.y);
                 return self.swap_cells(idx, &new_idx);
             } else {
@@ -322,17 +322,17 @@ impl<'a> ChunkWorker<'a> {
         let cell_in_direction = match self.get_other_cell(source, direction) {
             Some(cell) => cell.clone(),
             None => {
-                Cell::new(CellType::Stone, DirectionType::NONE)
+                Cell::from(CellType::Stone)
             }
         };
-        let other_density = cell_in_direction.get_density();
+        let other_density = cell_in_direction.physics.density();
         let max_speed = self.chunk.width as f32;
 
         let cell = &mut self.chunk.cells[source.idx];
         // Clamp current velocity
         cell.velocity = cell.velocity.clamp(Vec2::new(-max_speed, -max_speed), Vec2::new(max_speed, max_speed));
 
-        let cell_density = cell.get_density();
+        let cell_density = cell.physics.density();
         if other_density < cell_density {
             let limit = 5.;
             match direction {
@@ -366,9 +366,9 @@ impl<'a> ChunkWorker<'a> {
                 DirectionType::LEFT | DirectionType::RIGHT => {
                     if other_velocity.x.abs() < 0.5 {
                         // deflection into y direction based on cell movement type
-                        if cell.get_movement().contains(DirectionType::DOWN) {
+                        if cell.physics.direction().contains(DirectionType::DOWN) {
                             cell.velocity.y -= cell.velocity.x / 3.;
-                        } else if cell.get_movement().contains(DirectionType::UP) {
+                        } else if cell.physics.direction().contains(DirectionType::UP) {
                             cell.velocity.y += cell.velocity.x / 3.;
                         }
                         cell.velocity.x = 0.;
@@ -408,7 +408,7 @@ impl<'a> ChunkWorker<'a> {
 
     fn apply_velocity(&mut self, idx: &WorkerIndex) -> bool {
         let cell = &mut self.chunk.cells[idx.idx];
-        let cell_density = cell.get_density();
+        let cell_density = cell.physics.density();
 
         let vector_length = cell.velocity.length();
 
@@ -424,7 +424,7 @@ impl<'a> ChunkWorker<'a> {
         cell.velocity.y = cell.velocity.y.clamp(-max_velocity, max_velocity);
 
         // reset x dir
-        if cell.get_type() == CellType::Sand && cell.velocity.x.abs() < 1. {
+        if cell.physics == PhysicsType::SoftSolid(CellType::Sand) && cell.velocity.x.abs() < 1. {
             cell.velocity.x = 0.;
         }
 
@@ -447,7 +447,7 @@ impl<'a> ChunkWorker<'a> {
             let other_cell = self.get_cell(x, y);
 
             // cell is none or solid, cannot move futher
-            if other_cell.is_none() || matches!(other_cell.unwrap().get_state_type(), StateType::HardSolid(_)) {
+            if other_cell.is_none() || matches!(other_cell.unwrap().physics, PhysicsType::HardSolid(_)) {
                 if i == 1 || other_cell.is_none() {
                     // immediately stoped
                     let cell = &mut self.chunk.cells[idx.idx];
@@ -468,7 +468,7 @@ impl<'a> ChunkWorker<'a> {
                     }
                 }
             } else {
-                if other_cell.unwrap().get_density() < cell_density {
+                if other_cell.unwrap().physics.density() < cell_density {
                     // new furthest position
                     drag = 0.7;
                     (max_x, max_y) = (x as f32, y as f32);
@@ -568,7 +568,7 @@ pub fn get_surrounding_chunks<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::world::{get_chunk_references, PixelWorld};
+    use crate::pixel::world::{get_chunk_references, PixelWorld};
 
     use super::*;
 
