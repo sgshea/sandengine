@@ -20,7 +20,7 @@ compile-wasm:
 
 # Use wasm-bindgen to generate JS bindings and move files
 generate-js:
-    wasm-bindgen --no-typescript --target web --out-dir ./wasm/ --out-name "sandengine" ./target/wasm32-unknown-unknown/release/sandengine.wasm
+    wasm-bindgen --no-typescript --target web --out-dir ./wasm/ --out-name "sandengine" ./target/wasm32-unknown-unknown/wasm-release/sandengine.wasm
 
 # Move index.html and assets
 move-files:
