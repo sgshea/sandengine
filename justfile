@@ -8,6 +8,7 @@ run:
 install-deps:
     rustup target add wasm32-unknown-unknown
     cargo install wasm-bindgen-cli
+    cargo install wasm-opt
     RUSTC_BOOTSTRAP=1 cargo install --git https://github.com/thecoshman/http
 
 # Remove previous build
