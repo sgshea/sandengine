@@ -1,6 +1,6 @@
 use bevy::utils::hashbrown::HashMap;
 
-use crate::{cell::Cell, chunk::{PixelChunk, SplitChunk}, cworker::ChunkWorker};
+use super::{cell::Cell, chunk::{PixelChunk, SplitChunk}, cworker::ChunkWorker};
 use rand::seq::SliceRandom;
 
 pub struct PixelWorld {

@@ -1,4 +1,4 @@
-use crate::{cell::Cell, cell_types::CellType};
+use super::{cell::Cell, cell_types::CellType};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {

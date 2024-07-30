@@ -23,7 +23,6 @@ impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(RigidStorage::default())
             .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
-            .add_plugins(RapierDebugRenderPlugin::default())
             .add_systems(FixedUpdate, generate_colliders)
             .add_plugins((
                 TnuaRapier2dPlugin::new(FixedUpdate),
