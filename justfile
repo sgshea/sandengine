@@ -1,6 +1,8 @@
-# Run using dynamic linking
 run:
-    cargo run --features bevy/dynamic_linking
+    cargo run
+
+run-release:
+    cargo run --profile release --no-default-features
 
 # Following instructions to comiple and run the project for WASM
 
@@ -17,7 +19,7 @@ clean:
 
 # Compile the wasm file
 compile-wasm:
-    RUSTFLAGS="--cfg=web_sys_unstable_apis" cargo build --profile wasm-release --target wasm32-unknown-unknown
+    RUSTFLAGS="--cfg=web_sys_unstable_apis" cargo build --profile wasm-release --no-default-features --target wasm32-unknown-unknown
 
 # Use wasm-bindgen to generate JS bindings and move files
 generate-js:
