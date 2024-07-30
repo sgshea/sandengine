@@ -3,7 +3,7 @@ use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
-pub enum CellType {
+pub(crate) enum CellType {
     Empty,
     Sand,
     Dirt,
@@ -82,7 +82,7 @@ impl CellType {
 // What kind of cell state is it?
 // Used to determine simple behaviors, but allows access to a more specific CellType
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
-pub enum StateType {
+pub(crate) enum StateType {
     Empty(CellType),
     SoftSolid(CellType), // Soft solid, like sand that can move
     HardSolid(CellType), // Hard solid, like stone that can't move

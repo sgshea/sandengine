@@ -1,6 +1,6 @@
 use bevy::math::Vec2;
 
-use crate::cell_types::{CellType, DirectionType, StateType};
+use super::cell_types::{CellType, DirectionType, StateType};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]

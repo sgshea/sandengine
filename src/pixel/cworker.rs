@@ -3,7 +3,7 @@ use std::{fmt::Debug, mem};
 use bevy::{math::Vec2, utils::hashbrown::HashMap};
 use rand::Rng;
 
-use crate::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
+use super::{cell::Cell, cell_types::{CellType, DirectionType, StateType}, chunk::{PixelChunk, SplitChunk}};
 
 pub struct ChunkWorker<'a> {
     chunk: &'a mut PixelChunk,
@@ -568,7 +568,7 @@ pub fn get_surrounding_chunks<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::world::{get_chunk_references, PixelWorld};
+    use crate::pixel::world::{get_chunk_references, PixelWorld};
 
     use super::*;
 

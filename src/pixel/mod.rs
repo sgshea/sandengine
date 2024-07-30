@@ -1,9 +1,16 @@
+pub mod world;
+mod chunk;
+mod cworker;
+pub mod cell;
+pub mod cell_types;
+
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
 
-use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
+use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, pixel::world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
 
 pub struct PixelPlugin;
+
 impl Plugin for PixelPlugin {
     fn build(&self, app: &mut App) {
         app
@@ -15,14 +22,14 @@ impl Plugin for PixelPlugin {
                 (update_pixel_simulation, render_pixel_simulation)
                 .chain()
                 .distributive_run_if(in_state(AppState::Running)),
-            )
-            .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
+            );
+            // .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
 
     }
 }
 
 #[derive(Component)]
-pub struct PixelSimulation {
+pub(crate) struct PixelSimulation {
     pub world: PixelWorld,
     pub image_handle: Handle<Image>,
 }

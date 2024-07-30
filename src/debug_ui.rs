@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{cell::Cell, cell_types::CellType, pixel_plugin::PixelSimulation, AppState, CHUNK_SIZE, WORLD_SIZE};
+use crate::{pixel::{cell::Cell, cell_types::CellType, PixelSimulation}, AppState, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {
@@ -42,7 +42,7 @@ pub fn place_cells_at_pos(
 }
 
 #[derive(Resource, Default)]
-pub struct DebugInfo {
+pub(crate) struct DebugInfo {
     pub sim_time: Vec<f32>,
     pub render_construct_time: Vec<f32>,
     pub position: Vec2,

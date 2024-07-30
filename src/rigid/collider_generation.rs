@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 use contour::ContourBuilder;
 use geo::{Simplify, SimplifyVwPreserve, TriangulateEarcut};
 
-use crate::pixel_plugin::PixelSimulation;
+use crate::pixel::PixelSimulation;
 
 use super::RigidStorage;
 
