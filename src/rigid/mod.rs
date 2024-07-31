@@ -43,10 +43,6 @@ impl Plugin for SandEngineRigidPlugin {
                 FixedUpdate.intern(),
                 apply_platformer_controls.in_set(TnuaUserControlsSystemSet),
             );
-        
-        #[cfg(feature = "dev")]
-        app
-            .add_plugins(RapierDebugRenderPlugin::default());
     }
 }
 

@@ -5,6 +5,8 @@ mod debug_ui;
 
 mod input;
 
+mod dev_tools;
+
 use bevy::{prelude::*, window::{PresentMode, WindowResized}};
 use bevy_mod_picking::prelude::*;
 use bevy_egui::EguiPlugin;
@@ -43,6 +45,9 @@ impl Plugin for AppPlugin {
         .add_plugins(PixelPlugin)
         .init_state::<AppState>()
         .insert_resource(Time::<Fixed>::from_hz(64.));
+
+        #[cfg(feature = "dev")]
+        app.add_plugins(dev_tools::plugin);
     }
 }
 
