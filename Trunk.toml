@@ -6,7 +6,6 @@ dist = "target/trunk"
 # This is needed in order to host the game on itch.io.
 public_url = "./"
 # Needed for egui wasm
-rustflags = ["--cfg=web_sys_unstable_apis"]
 
 [serve]
 # Required in order to receive 404s for missing assets, which is what Bevy expects.
