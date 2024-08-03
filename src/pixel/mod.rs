@@ -2,7 +2,6 @@ pub mod world;
 mod chunk;
 mod cworker;
 pub mod cell;
-pub mod cell_types;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
@@ -146,7 +145,7 @@ fn render_pixel_simulation(
             let x = i as i32 % WORLD_SIZE.0;
             let y = i as i32 / WORLD_SIZE.0;
             let cell = sim.world.get_cell(x, y).expect("Cell out of bounds");
-            let color = cell.get_color();
+            let color = &cell.color;
             pixel.copy_from_slice(color);
         });
     }

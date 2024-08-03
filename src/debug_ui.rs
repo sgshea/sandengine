@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{pixel::{cell::Cell, cell_types::CellType, PixelSimulation}, AppState, CHUNK_SIZE, WORLD_SIZE};
+use crate::{pixel::{cell::{Cell, CellType}, PixelSimulation}, AppState, CHUNK_SIZE, WORLD_SIZE};
 
 #[derive(Resource)]
 pub struct PixelSimulationInteraction {
