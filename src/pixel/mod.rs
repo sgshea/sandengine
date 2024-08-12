@@ -1,29 +1,32 @@
 pub mod world;
 mod chunk;
-mod cworker;
+mod chunk_handler;
+mod geometry_helpers;
 pub mod cell;
+pub mod debug;
+pub mod interaction;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, texture::ImageSampler}};
 use bevy_mod_picking::prelude::*;
 
-use crate::{debug_ui::{cell_at_pos_dbg, draw_chunk_gizmos, place_cells_at_pos, update_gizmos_config, DebugInfo, PixelSimulationInteraction}, rigid::SandEngineRigidPlugin, pixel::world::PixelWorld, AppState, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
+use crate::{pixel::world::PixelWorld, rigid::SandEngineRigidPlugin, MainCamera, WindowInformation, CHUNKS, RESOLUTION, WORLD_SIZE};
 
 pub struct PixelPlugin;
 
 impl Plugin for PixelPlugin {
     fn build(&self, app: &mut App) {
         app
-            .init_resource::<PixelSimulationInteraction>()
             .add_plugins(SandEngineRigidPlugin)
             .add_systems(Startup, setup_pixel_simulation)
             .add_systems(
                 FixedUpdate,
                 (update_pixel_simulation, render_pixel_simulation)
                 .chain()
-                .distributive_run_if(in_state(AppState::Running)),
-            );
-            // .add_systems(PostUpdate, (draw_chunk_gizmos, update_gizmos_config));
+            )
+            .add_plugins(interaction::plugin);
 
+        #[cfg(feature = "dev")]
+        app.add_plugins(debug::plugin);
     }
 }
 
@@ -41,39 +44,37 @@ fn setup_pixel_simulation(
     commands.spawn((Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::Fixed {
-                width: WORLD_SIZE.0 as f32,
-                height: WORLD_SIZE.1 as f32,
+                width: WORLD_SIZE.x as f32,
+                height: WORLD_SIZE.y as f32,
             },
             near: -1000.0,
             ..default()
         },
-        transform: Transform::from_xyz(WORLD_SIZE.0 as f32 / 2.0, WORLD_SIZE.1 as f32 / 2.0, 1000.0),
+        transform: Transform::from_xyz(WORLD_SIZE.x as f32 / 2.0, WORLD_SIZE.y as f32 / 2.0, 1000.0),
         ..default()
     }, MainCamera));
 
-    window_info.scale = (RESOLUTION.0 / WORLD_SIZE.0 as f32, RESOLUTION.1 / WORLD_SIZE.1 as f32);
+    window_info.scale = (RESOLUTION.x / WORLD_SIZE.x as f32, RESOLUTION.y / WORLD_SIZE.y as f32);
 
-    let world = PixelWorld::new(WORLD_SIZE.0, WORLD_SIZE.1, CHUNKS.0, CHUNKS.1);
+    let world = PixelWorld::new(WORLD_SIZE.x, WORLD_SIZE.y, CHUNKS.x, CHUNKS.y);
 
     let mut image = Image::new(
         Extent3d {
-            width: WORLD_SIZE.0 as u32,
-            height: WORLD_SIZE.1 as u32,
+            width: WORLD_SIZE.x as u32,
+            height: WORLD_SIZE.y as u32,
             ..default()
         },
         TextureDimension::D2,
-        vec![0; (WORLD_SIZE.0 * WORLD_SIZE.1 * 4) as usize],
+        vec![0; (WORLD_SIZE.x * WORLD_SIZE.y * 4) as usize],
         TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
     );
     image.sampler = ImageSampler::nearest();
     let image_handle = images.add(image);
 
-    // Image does not fill entire screen
-    // Will refactor/handle later once we have chunks as may decide to render each chunk separately (attaching image to each)
     commands.spawn((
         SpatialBundle {
-            transform: Transform::from_xyz(WORLD_SIZE.0 as f32 / 2.0, WORLD_SIZE.1 as f32 / 2.0, 0.0),
+            transform: Transform::from_xyz(WORLD_SIZE.x as f32 / 2.0, WORLD_SIZE.y as f32 / 2.0, 0.0),
             ..default()
         },
         PixelSimulation {
@@ -93,38 +94,6 @@ fn setup_pixel_simulation(
                     ..default()
                 },
                 PickableBundle::default(),
-                On::<Pointer<Click>>::run(|event: Listener<Pointer<Click>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>, window_info: ResMut<WindowInformation>| {
-                    if event.button == PointerButton::Primary {
-                        let event_pos = event.pointer_location.position;
-                        let cell_position = Vec2::new(
-                            event_pos.x / window_info.scale.0,
-                            WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
-                        );
-                        place_cells_at_pos(sim, pixel_interaction.cell_amount, cell_position, pixel_interaction.selected_cell);
-                    }
-                }),
-                On::<Pointer<Drag>>::run(|event: Listener<Pointer<Drag>>, sim: Query<&mut PixelSimulation>, pixel_interaction: ResMut<PixelSimulationInteraction>, window_info: ResMut<WindowInformation>| {
-                    if event.button == PointerButton::Primary {
-                        let event_pos = event.pointer_location.position;
-                        let cell_position = Vec2::new(
-                            event_pos.x / window_info.scale.0,
-                            WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
-                        );
-                        place_cells_at_pos(sim, pixel_interaction.cell_amount, cell_position, pixel_interaction.selected_cell);
-                    }
-                }),
-                On::<Pointer<Move>>::run(|event: Listener<Pointer<Move>>, sim: Query<&mut PixelSimulation>, dbg_info: ResMut<DebugInfo>, window_info: ResMut<WindowInformation> | {
-                    let event_pos = event.pointer_location.position;
-                    let cell_position = Vec2::new(
-                        event_pos.x / window_info.scale.0,
-                        WORLD_SIZE.1 as f32 - (event_pos.y / window_info.scale.1),
-                    );
-                    if cell_position.x < 0. || cell_position.y < 0. || cell_position.x > WORLD_SIZE.0 as f32 || cell_position.y > WORLD_SIZE.1 as f32 {
-                        // these are invalid
-                        return;
-                    }
-                    cell_at_pos_dbg(sim, cell_position, dbg_info);
-                }),
             ));
         });
 }
@@ -135,6 +104,8 @@ fn update_pixel_simulation(
     query.single_mut().world.update();
 }
 
+// Simple rendering function which iterates over all cells and copies to single image
+// Potential improvement later is to do this per chunk and only in updating chunks
 fn render_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
     mut images: ResMut<Assets<Image>>,
@@ -142,9 +113,9 @@ fn render_pixel_simulation(
     for sim in query.iter_mut() {
         let image = images.get_mut(&sim.image_handle).unwrap();
         image.data.chunks_mut(4).enumerate().for_each(|(i, pixel)| {
-            let x = i as i32 % WORLD_SIZE.0;
-            let y = i as i32 / WORLD_SIZE.0;
-            let cell = sim.world.get_cell(x, y).expect("Cell out of bounds");
+            let x = i as i32 % WORLD_SIZE.x;
+            let y = i as i32 / WORLD_SIZE.x;
+            let cell = sim.world.get_cell(IVec2 { x, y }).expect("Cell out of bounds");
             let color = &cell.color;
             pixel.copy_from_slice(color);
         });

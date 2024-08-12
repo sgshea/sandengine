@@ -12,7 +12,6 @@ default = [
 dev = [
     # Improve compile times for dev builds by linking Bevy as a dynamic library.
     "bevy/dynamic_linking",
-    "bevy/bevy_dev_tools",
 ]
 dev_native = [
     "dev",
@@ -23,11 +22,10 @@ dev_native = [
 ]
 
 [dependencies]
-bevy = { version = "0.14.0", features = ["wayland"]}
+bevy = { version = "0.14.1", features = ["wayland"]}
 bevy_mod_picking = { version = "0.20.1", default-features = false, features = [ "backend_egui", "backend_sprite" ] }
 bevy_egui = { version = "0.28.0", default-features = false }
 
-bitflags = "2.4.2"
 rand = "0.8.5"
 strum = { version="0.26.1", features= [ "derive" ] }
 

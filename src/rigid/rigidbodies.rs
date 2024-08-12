@@ -1,22 +1,7 @@
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_rapier2d::prelude::*;
 
-
 use super::collider_generation::create_collider;
-
-// DynamicPhysicsEntity (DPE) is created each frame for the RigidBodyImageHandle, to faciliate interaction with the pixel engine
-#[derive(Component)]
-pub struct DynamicPhysicsEntity {
-    pub width: u32,
-    pub height: u32,
-
-    pub position: Vec2,
-
-    pub image: Option<Handle<Image>>,
-
-    // Cells occupied by the entity in world space
-    pub cells: Vec<(u32, u32)>,
-}
 
 #[derive(Resource)]
 pub struct RigidBodyImageHandle {
@@ -27,7 +12,7 @@ pub fn load_rigidbody_image(
     server: Res<AssetServer>,
     mut rigidbody_image: ResMut<RigidBodyImageHandle>,
 ) {
-    let image_handle = server.load("box.png");
+    let image_handle = server.load("images/box.png");
     rigidbody_image.handle = Some(image_handle);
 }
 
@@ -36,12 +21,12 @@ pub fn add_rigidbody(
     mut commands: Commands,
     images: Res<Assets<Image>>,
     rigidbody_image: Res<RigidBodyImageHandle>,
-    position: Vec2,
+    position: IVec2,
 ) {
     let image_handle = rigidbody_image.handle.clone().unwrap();
     let image = images.get(&image_handle).unwrap();
 
-    let values = image_valuemap(&image);
+    let values = image_valuemap(image);
     let collider = create_collider(&values, image.width(), image.height()).unwrap();
     // let collider = Collider::cuboid(8., 8.);
     
@@ -67,7 +52,7 @@ pub fn add_rigidbody(
                 anchor: Anchor::BottomLeft,
                 ..Default::default()
             },
-            transform: Transform::from_translation(Vec3::new(position.x, position.y, 0.0)),
+            transform: Transform::from_translation(position.extend(0).as_vec3()),
             ..Default::default()
         },
     ));

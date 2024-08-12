@@ -1,7 +1,7 @@
 use bevy::{math::vec2, prelude::*};
 use bevy_rapier2d::prelude::*;
 use contour::ContourBuilder;
-use geo::{Simplify, SimplifyVwPreserve, TriangulateEarcut};
+use geo::{SimplifyVwPreserve, TriangulateEarcut};
 
 use crate::pixel::PixelSimulation;
 
@@ -28,8 +28,8 @@ pub fn generate_colliders(
         // This uses the marching squares algorithm to create contours from the chunk data
         let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
                                                 // Adjust origin based on chunk position
-                                                .x_origin(chunk.pos_x * chunk_width)
-                                                .y_origin(chunk.pos_y * chunk_height)
+                                                .x_origin(chunk.position.x * chunk_width)
+                                                .y_origin(chunk.position.y * chunk_height)
                                                 .x_step(1.0)
                                                 .y_step(1.0);
         let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");

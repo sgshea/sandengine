@@ -1,7 +1,10 @@
-use bevy::utils::hashbrown::HashMap;
+use std::cell::UnsafeCell;
 
-use super::{cell::Cell, chunk::{PixelChunk, SplitChunk}, cworker::ChunkWorker};
-use rand::seq::SliceRandom;
+use bevy::{math::IVec2, utils::hashbrown::HashMap};
+
+use crate::{pixel::chunk_handler::SimulationChunkContext, CHUNK_SIZE};
+
+use super::{cell::Cell, chunk::PixelChunk, geometry_helpers::DIRECTIONS};
 
 pub struct PixelWorld {
     c_height: i32,
@@ -10,7 +13,7 @@ pub struct PixelWorld {
     chunks_x: i32,
     chunks_y: i32,
 
-    pub chunks_lookup: HashMap<(i32, i32), PixelChunk>,
+    pub chunks: HashMap<IVec2, PixelChunk>,
 
     iteration: u32,
 }
@@ -23,13 +26,13 @@ impl PixelWorld {
             c_width: t_width / chunks_y,
             chunks_x,
             chunks_y,
-            chunks_lookup: HashMap::new(),
+            chunks: HashMap::new(),
             iteration: 0
         };
 
         // create chunks
-        for x in 0..chunks_x {
-            for y in 0..chunks_y {
+        for x in 0..new_world.chunks_x {
+            for y in 0..new_world.chunks_y {
                 new_world.create_chunk(x, y);
             }
         }
@@ -37,49 +40,13 @@ impl PixelWorld {
         new_world
     }
 
-    // Get locations of all chunks that are awake
-    pub fn get_awake_chunk_locs(&self) -> Vec<(i32, i32)> {
-        self.chunks_lookup.values().filter_map(|chunk| {
-            if chunk.awake {
-                Some((chunk.pos_x, chunk.pos_y))
-            } else {
-                None
-            }
-        }).collect()
-    }
-
-    pub fn get_chunk_location(&self, x: i32, y: i32) -> (i32, i32) {
-        (x / self.c_width, y / self.c_height)
+    pub fn get_awake_chunks(&self) -> Vec<IVec2> {
+        self.chunks.iter().map(|(key, _val)| *key ).collect()
     }
 
     fn create_chunk(&mut self, x: i32, y: i32) {
         let chunk = PixelChunk::new(self.c_width, self.c_height, x, y);
-        self.chunks_lookup.insert((x, y), chunk);
-    }
-
-    pub fn get_cell(&self, x: i32, y: i32) -> Option<&Cell> {
-        if x < 0 || y < 0 || x >= self.get_total_width() || y >= self.get_total_height() {
-            return None;
-        }
-        match self.chunks_lookup.get(&self.get_chunk_location(x, y)) {
-            Some(chunk) => Some(chunk.get_cell_2d(x, y)),
-            None => None,
-        }
-    }
-
-    pub fn set_cell(&mut self, x: i32, y: i32, cell: Cell) {
-        match self.chunks_lookup.get_mut(&self.get_chunk_location(x, y)) {
-            Some(chunk) => chunk.set_cell(x, y, cell),
-            None => (),
-        }
-    }
-
-    pub fn get_total_width(&self) -> i32 {
-        self.c_width * self.chunks_x
-    }
-
-    pub fn get_total_height(&self) -> i32 {
-        self.c_height * self.chunks_y
+        self.chunks.insert(IVec2 { x, y }, chunk);
     }
 
     pub fn get_chunk_width(&self) -> i32 {
@@ -91,74 +58,80 @@ impl PixelWorld {
     }
 
     pub fn get_chunks(&self) -> Vec<&PixelChunk> {
-        self.chunks_lookup.values().collect()
+        self.chunks.values().collect()
     }
 
-    // Update cells
+    fn chunk(&self, position: IVec2) -> Option<&PixelChunk> {
+        self.chunks.get(&position)
+    }
+
+    fn chunk_mut(&mut self, position: IVec2) -> Option<&mut PixelChunk> {
+        self.chunks.get_mut(&position)
+    }
+
+    pub fn cell_to_chunk_position(position: IVec2) -> IVec2 {
+        position.div_euclid(CHUNK_SIZE)
+    }
+
+    pub fn cell_to_position_in_chunk(position: IVec2) -> IVec2 {
+        let chunk_position = Self::cell_to_chunk_position(position);
+
+        position - chunk_position * CHUNK_SIZE.x
+    }
+
+    pub fn get_cell(&self, position: IVec2) -> Option<Cell> {
+        let chunk = self.chunk(Self::cell_to_chunk_position(position))?;
+
+        let local = Self::cell_to_position_in_chunk(position);
+        Some(chunk.get_cell(local))
+    }
+
+    pub fn set_cell(&mut self, position: IVec2, cell: Cell) {
+        let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(position)) else {
+            return;
+        };
+
+        let local = Self::cell_to_position_in_chunk(position);
+        chunk.set_cell(local.x, local.y, cell);
+    }
+
+    // Main update function
     pub fn update(&mut self) {
-        let all_pos = self.chunks_lookup.keys().map(|pos| *pos).collect::<Vec<(i32, i32)>>();
+        let all_pos: Vec<IVec2> = self.chunks.keys().map(|pos| *pos).collect::<Vec<IVec2>>();
 
-        // Shuffle iterations each time
-        let mut iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
-        let rng = &mut rand::thread_rng();
-        iterations.shuffle(rng);
+        for pos in all_pos.clone() {
+            if let Some(ch) = self.chunk_mut(pos) {
+                ch.commit_cells_unupdated();
+            }
+        }
 
-        for (x, y) in iterations.iter() {
-            let iteration_x_y = (*x, *y);
-            let chunks = &mut self.chunks_lookup;
-            let mut current_references: HashMap<(i32, i32), SplitChunk> = HashMap::new();
-            get_chunk_references(chunks, &mut current_references, iteration_x_y);
+        let iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
 
+        for iter in iterations {
             all_pos.iter().for_each(|pos| {
-                let x = (pos.0 + iteration_x_y.0) % 2 == 0;
-                let y = (pos.1 + iteration_x_y.1) % 2 == 0;
-                if x && y {
-                    // Lifetime explanation:
-                    // we can borrow on each iteration because no references to the hashmap items are kept
-                    // the ChunkWorker removes the center chunk from the hashmap, so we can borrow the hashmap again
-                    // the needed parts of the SplitChunk are also removed from the hashmap using mem::take and similarly not kept in the hashmaps
-                    ChunkWorker::new_from_chunk_ref(pos, &mut current_references, self.iteration % 2 == 0).update();
+                let xx = (pos.x + iter.0) % 2 == 0;
+                let yy = (pos.y + iter.1) % 2 == 0;
+                if xx && yy {
+                    let arr = DIRECTIONS
+                    .map(|dir|{
+                        let chunk = self.chunk_mut(*pos + dir);
+                        match chunk {
+                            Some(c) => {
+                                let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
+                                Some(cell_chunk)
+                            },
+                            None => None,
+                        }
+                    }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
+
+                    // Simulate a chunk by creating the context
+                    SimulationChunkContext {
+                        center_position: *pos,
+                        data: &mut arr.try_into().unwrap(),
+                    }.simulate();
                 }
             });
         }
-        // reset updated_at and swap buffers
-        self.chunks_lookup.values_mut().for_each(|chunk| {
-            // swap buffers and reset updated
-            chunk.cells.iter_mut().for_each(|cell| {
-                cell.updated = 0;
-            });
-        });
         self.iteration += 1;
     }
-}
-
-// Turns all chunks into split chunks
-pub(crate) fn get_chunk_references<'a>(
-    chunks: &'a mut HashMap<(i32, i32), PixelChunk>,
-    current: &mut HashMap<(i32, i32), SplitChunk<'a>>,
-    iteration_x_y: (i32, i32),
-) {
-    chunks.iter_mut().for_each(|(pos, chunk)| {
-        let x = (pos.0 + iteration_x_y.0) % 2 == 0;
-        let y = (pos.1 + iteration_x_y.1) % 2 == 0;
-
-        match (x, y) {
-            (true, true) => {
-                // for the 'center' chunks, because SplitChunk references the whole chunk, we just insert into the current references
-                current.insert(*pos, SplitChunk::from_chunk(chunk));
-            },
-            (false, true) => {
-                let cur = SplitChunk::from_chunk_side(chunk);
-                current.insert(*pos, cur);
-            },
-            (true, false) => {
-                let cur = SplitChunk::from_chunk_vert(chunk);
-                current.insert(*pos, cur);
-            },
-            (false, false) => {
-                let cur = SplitChunk::from_chunk_corners(chunk);
-                current.insert(*pos, cur);
-            },
-        }
-    });
 }

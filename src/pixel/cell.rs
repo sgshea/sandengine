@@ -1,4 +1,3 @@
-use bitflags::bitflags;
 use bevy::math::Vec2;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
@@ -7,13 +6,15 @@ use strum::{EnumIter, VariantNames};
 pub(crate) struct Cell {
     pub color: [u8; 4],
     pub velocity: Vec2,
-    pub updated: u8,
 
     pub physics: PhysicsType,
+
+    pub updated: bool,
 }
 
-#[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames, Default)]
 pub(crate) enum CellType {
+    #[default]
     Empty,
     Sand,
     Dirt,
@@ -22,8 +23,9 @@ pub(crate) enum CellType {
     Smoke,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter, Default)]
 pub(crate) enum PhysicsType {
+    #[default]
     Empty,
     // Soft solid, like sand that can move
     SoftSolid(CellType),
@@ -35,12 +37,6 @@ pub(crate) enum PhysicsType {
     Gas(CellType),
     // Special case for rigid bodies which don't use cell physics but still contain cells
     RigidBody(CellType),
-}
-
-impl Default for CellType {
-    fn default() -> Self {
-        CellType::Empty
-    }
 }
 
 impl CellType {
@@ -104,12 +100,6 @@ impl CellType {
     }
 }
 
-impl Default for PhysicsType {
-    fn default() -> Self {
-        PhysicsType::Empty
-    }
-}
-
 impl From<CellType> for PhysicsType {
     fn from(ctype: CellType) -> Self {
         match ctype {
@@ -134,17 +124,6 @@ impl PhysicsType {
             PhysicsType::RigidBody(cell) => cell.cell_density(),
         }
     }
-
-    pub fn direction(&self) -> DirectionType {
-        match self {
-            PhysicsType::Empty => DirectionType::empty(),
-            PhysicsType::SoftSolid(_) => DirectionType::DOWN | DirectionType::DOWN_LEFT | DirectionType::DOWN_RIGHT,
-            PhysicsType::HardSolid(_) => DirectionType::empty(),
-            PhysicsType::Liquid(_) => DirectionType::DOWN | DirectionType::LEFT | DirectionType::RIGHT,
-            PhysicsType::Gas(_) => DirectionType::UP | DirectionType::LEFT | DirectionType::RIGHT,
-            PhysicsType::RigidBody(_) => DirectionType::empty(),
-        }
-    }
 }
 
 impl Cell {
@@ -152,9 +131,13 @@ impl Cell {
         Self {
             color: cell_type.cell_color(),
             velocity: Vec2::ZERO,
-            updated: 0,
             physics: PhysicsType::from(cell_type),
+            updated: false,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.physics == PhysicsType::Empty
     }
 }
 
@@ -169,41 +152,8 @@ impl Default for Cell {
         Self {
             color: CellType::Empty.cell_color(),
             velocity: Vec2::ZERO,
-            updated: 0,
             physics: PhysicsType::Empty,
-        }
-    }
-}
-
-// Direction stored as bitflags
-bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-    pub(crate) struct DirectionType: u32 {
-        const NONE = 0;
-        const DOWN = 0b00000001;
-        const DOWN_LEFT = 0b00000010;
-        const DOWN_RIGHT = 0b00000100;
-        const LEFT = 0b00001000;
-        const RIGHT = 0b00010000;
-        const UP = 0b00100000;
-        const UP_LEFT = 0b01000000;
-        const UP_RIGHT = 0b10000000;
-    }
-}
-
-impl DirectionType {
-    pub fn get_tuple_direction(self) -> (i32, i32) {
-        match self {
-            DirectionType::NONE => (0, 0),
-            DirectionType::DOWN => (0, -1),
-            DirectionType::DOWN_LEFT => (-1, -1),
-            DirectionType::DOWN_RIGHT => (1, -1),
-            DirectionType::LEFT => (-1, 0),
-            DirectionType::RIGHT => (1, 0),
-            DirectionType::UP => (0, 1),
-            DirectionType::UP_LEFT => (-1, 1),
-            DirectionType::UP_RIGHT => (1, 1),
-            _ => (0, 0),
+            updated: false,
         }
     }
 }

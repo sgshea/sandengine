@@ -150,8 +150,6 @@ pub struct CharacterMotionConfigForPlatformer {
     pub walk: TnuaBuiltinWalk,
     pub actions_in_air: usize,
     pub jump: TnuaBuiltinJump,
-    pub crouch: TnuaBuiltinCrouch,
     pub dash_distance: Float,
     pub dash: TnuaBuiltinDash,
-    pub one_way_platforms_min_proximity: Float,
 }
