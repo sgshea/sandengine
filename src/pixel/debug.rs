@@ -1,5 +1,6 @@
 //! Debug egui window for information directly relating to pixel world
 
+use bevy::color::palettes::css::{LIGHT_GRAY, LIGHT_GREEN};
 use bevy::prelude::*;
 
 use bevy::math::IVec2;
@@ -18,6 +19,8 @@ struct PixelSimulationDebug {
     pub position_in_chunk: IVec2,
     // Currently hovered cell
     pub hovered_cell: Option<Cell>,
+    // Is cursor inside the chunk's dirty rect
+    pub inside_dirty_rect: bool,
     // Position of hovered chunk
     pub chunk_position: IVec2,
     // Amount of chunks
@@ -26,6 +29,8 @@ struct PixelSimulationDebug {
     pub chunk_size: u32,
 
     pub show_chunk_borders: bool,
+
+    
 }
 
 pub(super) fn plugin(app: &mut App) {
@@ -49,6 +54,7 @@ fn pixel_simulation_debug(
     dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(cell_pos);
     dbg.chunk_position = PixelWorld::cell_to_chunk_position(cell_pos);
     dbg.hovered_cell = world.get_cell(cell_pos);
+    dbg.inside_dirty_rect = world.cell_inside_dirty(cell_pos);
 
     dbg.chunk_size = world.get_chunk_width() as u32;
     dbg.chunk_amount = world.get_chunks().len() as u32;
@@ -66,6 +72,7 @@ fn pixel_simulation_debug_ui(
             ui.separator();
             ui.label(format!("Current Chunk: {:?}", dbg.chunk_position));
             ui.label(format!("Current Cell: {:?}", dbg.hovered_cell));
+            ui.label(format!("Inside dirty rect?: {:?}", dbg.inside_dirty_rect));
             ui.label(format!("Cell position in world: {:?}", pxl.hovered_position));
             ui.label(format!("Cell position in chunk: {:?}", dbg.position_in_chunk));
             ui.separator();
@@ -87,21 +94,35 @@ pub fn draw_chunk_gizmos(
 
     let sim = pixel_query.single();
 
-    let awake_chunks = sim.world.get_awake_chunks();
+    let awake_chunks = sim.world.get_chunk_dirty_rects();
 
-    // Draw a green rectangle for each awake chunk
-    for pos in awake_chunks {
-        let pos_x = ((pos.x as f32 * CHUNK_SIZE.x as f32) - WORLD_SIZE.x as f32 / 2.0) + CHUNK_SIZE.x as f32 / 2.0;
-        let pos_y = ((pos.y as f32 * CHUNK_SIZE.y as f32) - WORLD_SIZE.y as f32 / 2.0) + CHUNK_SIZE.y as f32 / 2.0;
+    for (pos, rect) in awake_chunks {
+        // Calculate position in screen
+        let pos_x = (pos.x as f32 * CHUNK_SIZE.x as f32) - WORLD_SIZE.x as f32 / 2.0;
+        let pos_y = (pos.y as f32 * CHUNK_SIZE.y as f32) - WORLD_SIZE.y as f32 / 2.0;
+        
+        // Draw light gray outline of chunk
         chunk_gizmos.rect_2d(
             Vec2::new(
-                pos_x + origin_x,
-                pos_y + origin_y,
+                origin_x + pos_x + CHUNK_SIZE.x as f32 / 2.,
+                origin_y + pos_y + CHUNK_SIZE.y as f32 / 2.,
             ),
             0.0,
             CHUNK_SIZE.as_vec2(),
-            Color::srgba(0.0, 1.0, 0.0, 0.5),
+            LIGHT_GRAY,
         );
+        // Draw green outline of dirty rect if exists
+        if !rect.is_empty() {
+            chunk_gizmos.rect_2d(
+                Vec2::new(
+                    origin_x + pos_x,
+                    origin_y + pos_y,
+                ) + rect.center_display(),
+                0.0,
+                rect.size().as_vec2(),
+                LIGHT_GREEN,
+            );
+        }
     }
 }
 

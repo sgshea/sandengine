@@ -4,7 +4,7 @@ use bevy::{math::IVec2, utils::hashbrown::HashMap};
 
 use crate::{pixel::chunk_handler::SimulationChunkContext, CHUNK_SIZE};
 
-use super::{cell::Cell, chunk::PixelChunk, geometry_helpers::DIRECTIONS};
+use super::{cell::Cell, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS}};
 
 pub struct PixelWorld {
     c_height: i32,
@@ -40,8 +40,16 @@ impl PixelWorld {
         new_world
     }
 
-    pub fn get_awake_chunks(&self) -> Vec<IVec2> {
-        self.chunks.iter().map(|(key, _val)| *key ).collect()
+    // Return position of chunk and dirty rect
+    pub fn get_chunk_dirty_rects(&self) -> Vec<(IVec2, BoundRect)> {
+        self.chunks.iter()
+            .map(|(key, val)| {
+                (
+                    *key,
+                    val.current_dirty_rect
+                )
+            })
+            .collect()
     }
 
     fn create_chunk(&mut self, x: i32, y: i32) {
@@ -86,6 +94,17 @@ impl PixelWorld {
         Some(chunk.get_cell(local))
     }
 
+    pub fn cell_inside_dirty(&self, position: IVec2) -> bool {
+        let chunk = self.chunk(Self::cell_to_chunk_position(position));
+
+        if let Some(chunk) = chunk {
+            let local = Self::cell_to_position_in_chunk(position);
+
+            return chunk.current_dirty_rect.contains(&local)
+        }
+        false
+    }
+
     pub fn set_cell(&mut self, position: IVec2, cell: Cell) {
         let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(position)) else {
             return;
@@ -98,6 +117,9 @@ impl PixelWorld {
     // Main update function
     pub fn update(&mut self) {
         let all_pos: Vec<IVec2> = self.chunks.keys().map(|pos| *pos).collect::<Vec<IVec2>>();
+
+        // Contains all the new updates, used to contruct dirty rects for next frame
+        let mut dirty_rect_updates: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
 
         for pos in all_pos.clone() {
             if let Some(ch) = self.chunk_mut(pos) {
@@ -125,12 +147,29 @@ impl PixelWorld {
                     }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
 
                     // Simulate a chunk by creating the context
-                    SimulationChunkContext {
-                        center_position: *pos,
-                        data: &mut arr.try_into().unwrap(),
-                    }.simulate();
+                    let new_updates = SimulationChunkContext::new(
+                        *pos,
+                        &mut arr.try_into().unwrap(),
+                    ).simulate();
+
+                    // Push new updates into dirty rect updates
+                    for (position, cells) in new_updates {
+                        if let Some(existing) = dirty_rect_updates.get_mut(&position) {
+                            existing.extend(cells);
+                        } else {
+                            dirty_rect_updates.insert(position, cells);
+                        }
+                    }
                 }
             });
+        }
+
+        // Apply dirty rect updates
+        for (position, cells) in dirty_rect_updates {
+            if let Some(ch) = self.chunk_mut(position) {
+                ch.swap_rects();
+                ch.construct_dirty_rect(&cells);
+            }
         }
         self.iteration += 1;
     }

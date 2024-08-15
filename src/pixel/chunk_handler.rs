@@ -2,28 +2,40 @@
 //! It contains functions to help translate positions while updating and dealing with updating neighboring chunk data
 use std::cell::UnsafeCell;
 
-use bevy::math::{IRect, IVec2};
+use bevy::{math::IVec2, utils::hashbrown::HashMap};
 use rand::Rng;
 
 use crate::CHUNK_SIZE;
 
-use super::{cell::{Cell, PhysicsType}, chunk::PixelChunk, geometry_helpers::{VEC_DOWN, VEC_DOWN_LEFT, VEC_DOWN_RIGHT, VEC_LEFT, VEC_RIGHT, VEC_UP}};
+use super::{cell::{Cell, PhysicsType}, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS, VEC_DOWN, VEC_DOWN_LEFT, VEC_DOWN_RIGHT, VEC_LEFT, VEC_RIGHT, VEC_UP}};
 
 pub struct SimulationChunkContext<'a, 'b> {
     // Position of the center chunk in the world's chunk map
     pub center_position: IVec2,
     // The nine chunks, including the center chunk (in the fourth position), Chunks are None if there is no neighbor there such as on world boundaries
     pub data: &'a mut [Option<&'b UnsafeCell<PixelChunk>>; 9],
+
+    // List of updated positions for each chunk
+    pub dirty_updates: HashMap<IVec2, Vec<IVec2>>,
 }
 
 impl SimulationChunkContext<'_, '_> {
-    fn get_rect(&self, chunk: usize) -> Option<IRect> {
+
+    pub fn new<'a>(center_position: IVec2, data: &'a mut [Option<&'a UnsafeCell<PixelChunk>>; 9]) -> SimulationChunkContext<'a, 'a> {
+        let mut dirty_updates = HashMap::new();
+        for direction in DIRECTIONS {
+            dirty_updates.insert(center_position + direction, Vec::new());
+        }
+        SimulationChunkContext { center_position, data, dirty_updates }
+    }
+
+    fn get_rect(&self, chunk: usize) -> BoundRect {
         match self.data[chunk] {
             Some(c) => {
                 let pc = unsafe { &*c.get() };
-                Some(pc.boundary_rect)
+                pc.current_dirty_rect.union(&pc.previous_dirty_rect)
             },
-            None => None,
+            None => BoundRect::empty()
         }
     }
 
@@ -35,6 +47,7 @@ impl SimulationChunkContext<'_, '_> {
         &chunk.cells[index]
     }
 
+    // Transforms a 2d position into the 1d index
     fn cell_index(chunk_width: usize, pos: IVec2) -> usize {
         pos.x as usize + pos.y as usize * chunk_width
     }
@@ -93,23 +106,55 @@ impl SimulationChunkContext<'_, '_> {
     fn set_cell(&mut self, pos: IVec2, cell: Cell)  {
         let idx = Self::local_to_indices(pos);
         self.set_cell_from_index(idx, cell);
+        self.update_dirty_idx(pos);
+        // If the cell is on the side, update the adjacent chunks dirty rect
+        if pos.x == 0 {
+            self.update_dirty_idx(pos + IVec2::X * -1);
+        } else if pos.x == CHUNK_SIZE.x as i32 - 1 {
+            self.update_dirty_idx(pos + IVec2::X);
+        }
+        if pos.y == 0 {
+            self.update_dirty_idx(pos + IVec2::Y * -1);
+        } else if pos.y == CHUNK_SIZE.y as i32 - 1 {
+            self.update_dirty_idx(pos + IVec2::Y);
+        }
     }
 
-    fn set_updated_cell(&mut self, pos: IVec2)  {
+    fn set_updated_cell(&mut self, pos: IVec2) {
         let idx = Self::local_to_indices(pos);
         self.set_updated_cell_from_index(idx);
+        self.update_dirty_idx(pos);
+        // If the cell is on the side, update the adjacent chunks dirty rect
+        if pos.x == 0 {
+            self.update_dirty_idx(pos + IVec2::X * -1);
+        } else if pos.x == CHUNK_SIZE.x as i32 - 1 {
+            self.update_dirty_idx(pos + IVec2::X);
+        }
+        if pos.y == 0 {
+            self.update_dirty_idx(pos + IVec2::Y * -1);
+        } else if pos.y == CHUNK_SIZE.y as i32 - 1 {
+            self.update_dirty_idx(pos + IVec2::Y);
+        }
     }
 
-    pub fn simulate(&mut self) {
+    fn update_dirty_idx(&mut self, pos: IVec2) {
+        let rel_chunk = pos.div_euclid(CHUNK_SIZE);
+        let chunk_vec = self.dirty_updates.get_mut(&(self.center_position + rel_chunk));
+        if let Some(vec) = chunk_vec {
+            vec.push(pos.rem_euclid(CHUNK_SIZE))
+        }
+    }
+
+    pub fn simulate(&mut self) -> HashMap<IVec2, Vec<IVec2>> {
         const CENTER: usize = 4;
 
-        let center_rect = self.get_rect(CENTER).expect("Center chunk should always exist");
+        let center_rect = self.get_rect(CENTER).clone();
 
         // Iterate over dirty rect
-        for y in center_rect.min.y..center_rect.max.y {
+        for y in center_rect.min.y..=center_rect.max.y {
             // Alternate x direction
             if rand::thread_rng().gen_bool(0.5) {
-                for x in center_rect.min.x..center_rect.max.x {
+                for x in center_rect.min.x..=center_rect.max.x {
                     // Process this cell and set it with the result of the process
                     if let Some(cell) = self.process_cell(IVec2 { x, y }) {
                         self.set_cell(IVec2 { x, y }, Cell {
@@ -119,7 +164,7 @@ impl SimulationChunkContext<'_, '_> {
                     }
                 }
             } else {
-                for x in (center_rect.min.x..center_rect.max.x).rev() {
+                for x in (center_rect.min.x..=center_rect.max.x).rev() {
                     // Process this cell and set it with the result of the process
                     if let Some(cell) = self.process_cell(IVec2 { x, y }) {
                         self.set_cell(IVec2 { x, y }, Cell {
@@ -130,6 +175,8 @@ impl SimulationChunkContext<'_, '_> {
                 }
             }
         }
+
+        self.dirty_updates.clone()
     }
 
     fn move_down(&mut self, current: Cell, position: IVec2) -> Option<Cell> {

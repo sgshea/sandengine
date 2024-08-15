@@ -1,13 +1,13 @@
-use bevy::math::{IRect, IVec2};
+use bevy::math::IVec2;
 
 use crate::CHUNK_SIZE;
 
-use super::cell::{Cell, PhysicsType};
+use super::{cell::{Cell, PhysicsType}, geometry_helpers::BoundRect};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
-    // Will become dirty rect in future version
-    pub boundary_rect: IRect,
+    pub current_dirty_rect: BoundRect,
+    pub previous_dirty_rect: BoundRect,
 
     // Chunk position
     pub position: IVec2,
@@ -21,16 +21,18 @@ impl PixelChunk {
 
         PixelChunk {
             position: IVec2 { x: pos_x, y: pos_y },
-            boundary_rect: IRect {
+            current_dirty_rect: BoundRect {
                     min: IVec2::ZERO,
-                    max: CHUNK_SIZE,
-                },
+                    // We iterate over the range of the BoundRect to the end (inclusive) so we need to subtract 1 to not go out of bounds
+                    max: CHUNK_SIZE - 1,
+                    },
+            previous_dirty_rect: BoundRect::empty(),
             cells,
         }
     }
 
     pub fn get_index(&self, x: i32, y: i32) -> usize {
-        (y * self.boundary_rect.width() + x) as usize
+        (y * CHUNK_SIZE.x + x) as usize
     }
 
     pub fn get_cell(&self, position: IVec2) -> Cell {
@@ -47,6 +49,17 @@ impl PixelChunk {
     pub fn set_cell(&mut self, x: i32, y: i32, cell: Cell) {
         let idx = self.get_index(x, y);
         self.set_cell_1d(idx, cell);
+        self.current_dirty_rect = self.current_dirty_rect.union_point(&IVec2::new(x, y));
+    }
+
+    pub fn construct_dirty_rect(&mut self, points: &[IVec2]) {
+        let new_rect = BoundRect::from_points(points);
+        self.current_dirty_rect = new_rect;
+    }
+
+    pub fn swap_rects(&mut self) {
+        self.previous_dirty_rect = self.current_dirty_rect.union(&self.previous_dirty_rect);
+        self.current_dirty_rect = BoundRect::empty();
     }
 
     // Reset all cells to not be updated
