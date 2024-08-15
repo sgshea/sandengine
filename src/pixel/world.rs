@@ -1,6 +1,6 @@
 use std::cell::UnsafeCell;
 
-use bevy::{math::IVec2, utils::hashbrown::HashMap};
+use bevy::{math::IVec2, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
 
 use crate::{pixel::chunk_handler::SimulationChunkContext, CHUNK_SIZE};
 
@@ -116,6 +116,8 @@ impl PixelWorld {
 
     // Main update function
     pub fn update(&mut self) {
+        let taskpool = ComputeTaskPool::get();
+
         let all_pos: Vec<IVec2> = self.chunks.keys().map(|pos| *pos).collect::<Vec<IVec2>>();
 
         // Contains all the new updates, used to contruct dirty rects for next frame
@@ -133,31 +135,40 @@ impl PixelWorld {
             all_pos.iter().for_each(|pos| {
                 let xx = (pos.x + iter.0) % 2 == 0;
                 let yy = (pos.y + iter.1) % 2 == 0;
-                if xx && yy {
-                    let arr = DIRECTIONS
-                    .map(|dir|{
-                        let chunk = self.chunk_mut(*pos + dir);
-                        match chunk {
-                            Some(c) => {
-                                let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
-                                Some(cell_chunk)
-                            },
-                            None => None,
-                        }
-                    }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
+                if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
+                    let new_updates = {
+                        let arr = DIRECTIONS
+                        .map(|dir|{
+                            let chunk = self.chunk_mut(*pos + dir);
+                            match chunk {
+                                Some(c) => {
+                                    let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
+                                    Some(cell_chunk)
+                                },
+                                None => None,
+                            }
+                        }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
 
-                    // Simulate a chunk by creating the context
-                    let new_updates = SimulationChunkContext::new(
-                        *pos,
-                        &mut arr.try_into().unwrap(),
-                    ).simulate();
+                        // Simulate a chunk by creating the context and push into the taskpool for simulation
+                        let mut scc = SimulationChunkContext::new(
+                            *pos,
+                            arr.try_into().unwrap(),
+                        );
+                        taskpool.scope(|s| {
+                            s.spawn(async move {
+                                scc.simulate()
+                            })
+                        })
+                    };
 
                     // Push new updates into dirty rect updates
-                    for (position, cells) in new_updates {
-                        if let Some(existing) = dirty_rect_updates.get_mut(&position) {
-                            existing.extend(cells);
-                        } else {
-                            dirty_rect_updates.insert(position, cells);
+                    for i in new_updates {
+                        for (position, cells) in i {
+                            if let Some(existing) = dirty_rect_updates.get_mut(&position) {
+                                existing.extend(cells);
+                            } else {
+                                dirty_rect_updates.insert(position, cells);
+                            }
                         }
                     }
                 }

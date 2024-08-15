@@ -31,6 +31,10 @@ impl PixelChunk {
         }
     }
 
+    pub fn should_update(&self) -> bool {
+        !self.current_dirty_rect.is_empty()
+    }
+
     pub fn get_index(&self, x: i32, y: i32) -> usize {
         (y * CHUNK_SIZE.x + x) as usize
     }

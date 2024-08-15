@@ -9,19 +9,22 @@ use crate::CHUNK_SIZE;
 
 use super::{cell::{Cell, PhysicsType}, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS, VEC_DOWN, VEC_DOWN_LEFT, VEC_DOWN_RIGHT, VEC_LEFT, VEC_RIGHT, VEC_UP}};
 
-pub struct SimulationChunkContext<'a, 'b> {
+pub struct SimulationChunkContext<'a> {
     // Position of the center chunk in the world's chunk map
     pub center_position: IVec2,
     // The nine chunks, including the center chunk (in the fourth position), Chunks are None if there is no neighbor there such as on world boundaries
-    pub data: &'a mut [Option<&'b UnsafeCell<PixelChunk>>; 9],
+    pub data: [Option<&'a UnsafeCell<PixelChunk>>; 9],
 
     // List of updated positions for each chunk
     pub dirty_updates: HashMap<IVec2, Vec<IVec2>>,
 }
 
-impl SimulationChunkContext<'_, '_> {
+unsafe impl Send for SimulationChunkContext<'_> {}
+unsafe impl Sync for SimulationChunkContext<'_> {}
 
-    pub fn new<'a>(center_position: IVec2, data: &'a mut [Option<&'a UnsafeCell<PixelChunk>>; 9]) -> SimulationChunkContext<'a, 'a> {
+impl SimulationChunkContext<'_> {
+
+    pub fn new<'a>(center_position: IVec2, data: [Option<&'a UnsafeCell<PixelChunk>>; 9]) -> SimulationChunkContext<'a> {
         let mut dirty_updates = HashMap::new();
         for direction in DIRECTIONS {
             dirty_updates.insert(center_position + direction, Vec::new());
