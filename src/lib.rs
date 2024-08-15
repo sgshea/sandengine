@@ -25,6 +25,9 @@ impl Plugin for AppPlugin {
                     title: "Pixel Simulation".to_string(),
                     resolution: RESOLUTION.into(),
                     present_mode: PresentMode::AutoVsync,
+                    canvas: Some("#bevy".to_string()),
+                    fit_canvas_to_parent: true,
+                    prevent_default_event_handling: true,
                     ..default()
                 }),
                 ..default()}
