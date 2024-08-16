@@ -66,13 +66,6 @@ impl Default for RigidStorage {
 // Setting simple stage
 fn setup_physics_environment(mut commands: Commands) {
     let mut cmd = commands.spawn(Name::new("Floor"));
-    cmd.insert(SpriteBundle {
-        sprite: Sprite {
-            custom_size: Some(Vec2::new(128.0, 0.5)),
-            ..Default::default()
-        },
-        ..Default::default()
-    });
     cmd.insert(Collider::halfspace(Vec2::Y).unwrap());
     // move the floor to the bottom of the screen
     cmd.insert(Transform::from_xyz(0.0, 0.0, 0.0));
