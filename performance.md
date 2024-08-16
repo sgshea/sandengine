@@ -47,3 +47,10 @@ Currently multithreading is only implemented in one spot (simulating a chunk), b
 > Currently bevy does not support multithreaded execution on WASM builds, and the `bevy_tasks` module does not support multithreading.
 > However, `bevy_tasks` support for web [is merged and due for bevy 0.15 (next release)](https://github.com/bevyengine/bevy/pull/13889)
 > The project still works on WASM but this means performance is abit slower than native, optimizations from the dirty chunk system still help a lot
+### v0.2.1
+Switch to chunk-based rendering. No use of multithreading here, performance is good enough.
+- Down to 1us for the update_chunk_display system when nothing needs to be updated. Seeing around 20-35us when lots are updating.
+- This is a good improvement, before was taking around 600us constant *every frame*.
+- Stutter on load however, as more images need to be created at start
+
+- Also switched to no scaling, so cells are 1-1 pixels which makes quality better/more consistent

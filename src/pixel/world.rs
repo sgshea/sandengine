@@ -73,6 +73,17 @@ impl PixelWorld {
         self.chunks.get(&position)
     }
 
+    // Returns chunk data to render if the chunk has updated, None if not
+    pub fn should_render_data(&self, position: IVec2) -> Option<Vec<u8>> {
+        let chunk = self.chunk(position);
+        if let Some(c) = chunk {
+            if c.should_update() {
+                return Some(c.render_chunk())
+            }
+        }
+        None
+    }
+
     fn chunk_mut(&mut self, position: IVec2) -> Option<&mut PixelChunk> {
         self.chunks.get_mut(&position)
     }

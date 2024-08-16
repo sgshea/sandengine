@@ -1,11 +1,9 @@
-use bevy::math::Vec2;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cell {
     pub color: [u8; 4],
-    pub velocity: Vec2,
 
     pub physics: PhysicsType,
 
@@ -40,17 +38,6 @@ pub(crate) enum PhysicsType {
 }
 
 impl CellType {
-        // Density is how likely a cell is to move through liquids
-    pub fn cell_density(&self) -> f32 {
-        match self {
-            CellType::Empty => 0.0,
-            CellType::Sand => 60.0,
-            CellType::Dirt => 60.0,
-            CellType::Stone => 100.0,
-            CellType::Water => 50.0,
-            CellType::Smoke => 10.0,
-        }
-    }
 
     pub fn cell_color(&self) -> [u8; 4] {
         let mut trng = rand::thread_rng();
@@ -113,24 +100,10 @@ impl From<CellType> for PhysicsType {
     }
 }
 
-impl PhysicsType {
-    pub fn density(&self) -> f32 {
-        match self {
-            PhysicsType::Empty => 0.0,
-            PhysicsType::SoftSolid(cell) => cell.cell_density(),
-            PhysicsType::HardSolid(cell) => cell.cell_density(),
-            PhysicsType::Liquid(cell) => cell.cell_density(),
-            PhysicsType::Gas(cell) => cell.cell_density(),
-            PhysicsType::RigidBody(cell) => cell.cell_density(),
-        }
-    }
-}
-
 impl Cell {
     pub fn new(cell_type: CellType) -> Self {
         Self {
             color: cell_type.cell_color(),
-            velocity: Vec2::ZERO,
             physics: PhysicsType::from(cell_type),
             updated: false,
         }
@@ -151,7 +124,6 @@ impl Default for Cell {
     fn default() -> Self {
         Self {
             color: CellType::Empty.cell_color(),
-            velocity: Vec2::ZERO,
             physics: PhysicsType::Empty,
             updated: false,
         }

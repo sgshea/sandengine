@@ -85,4 +85,11 @@ impl PixelChunk {
             }
         }).collect::<Vec<f64>>()
     }
+
+    // Convert the grid to a byte array for rendering
+    pub fn render_chunk(&self) -> Vec<u8> {
+        self.cells.iter().flat_map(|cell| {
+            cell.color
+        }).collect::<Vec<u8>>()
+    }
 }

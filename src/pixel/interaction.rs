@@ -63,11 +63,19 @@ fn pixel_interaction_config(
     egui::Window::new("Pixel Simulation").show(ctx.ctx_mut(),
         | ui | {
             ui.set_min_width(200.);
+            ui.label("Controls:");
+            ui.label("Left click to place the selected cell type below");
+            ui.label("Right click to erase the selected cell type");
+            ui.label("Middle click to place a rigid body box object");
+            ui.separator();
             for (cell_type, name) in CellType::iter().zip(CellType::VARIANTS.iter()) {
                 ui.radio_value(&mut pxl.place_cell_type, cell_type, *name);
             }
 
             ui.add(egui::Slider::new(&mut pxl.place_cell_amount, 8..=100).text("Amount to spawn"));
+
+            ui.separator();
+            ui.label("Press F1 to toggle debug window and Rapier physics debug renderer");
         }
     );
 }
