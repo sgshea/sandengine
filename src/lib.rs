@@ -4,11 +4,13 @@ mod rigid;
 mod input;
 
 mod dev_tools;
+mod states;
 
 use bevy::{prelude::*, window::{PresentMode, WindowResized}};
 use bevy_mod_picking::prelude::*;
 use bevy_egui::EguiPlugin;
 use pixel::PixelPlugin;
+use states::DebugState;
 
 const RESOLUTION: Vec2 = Vec2::new(1920.0, 1080.0);
 const WORLD_SIZE: IVec2 = IVec2::new(256, 256);
@@ -33,15 +35,15 @@ impl Plugin for AppPlugin {
                 ..default()}
             ).set(ImagePlugin::default_nearest()),
             DefaultPickingPlugins,
-            EguiPlugin
+            EguiPlugin,
+            dev_tools::plugin,
         ))
+        .init_state::<DebugState>()
         .init_resource::<WindowInformation>()
+        .insert_resource(Time::<Fixed>::from_hz(64.))
         .add_systems(Update, resize_window)
-        .add_plugins(PixelPlugin)
-        .insert_resource(Time::<Fixed>::from_hz(64.));
-
-        #[cfg(feature = "dev")]
-        app.add_plugins(dev_tools::plugin);
+        .add_plugins(input::plugin)
+        .add_plugins(PixelPlugin);
     }
 }
 

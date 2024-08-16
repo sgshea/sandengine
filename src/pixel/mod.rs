@@ -25,7 +25,6 @@ impl Plugin for PixelPlugin {
             )
             .add_plugins(interaction::plugin);
 
-        #[cfg(feature = "dev")]
         app.add_plugins(debug::plugin);
     }
 }

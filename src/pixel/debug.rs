@@ -6,6 +6,8 @@ use bevy::prelude::*;
 use bevy::math::IVec2;
 use bevy_egui::{egui, EguiContexts};
 
+use crate::dev_tools::PixelSimulationDebugUi;
+use crate::states::DebugState;
 use crate::{CHUNK_SIZE, WORLD_SIZE};
 
 use super::cell::Cell;
@@ -29,18 +31,13 @@ struct PixelSimulationDebug {
     pub chunk_size: u32,
 
     pub show_chunk_borders: bool,
-
-    
 }
 
 pub(super) fn plugin(app: &mut App) {
-        app.add_systems(FixedUpdate, pixel_simulation_debug);
-
         app.init_resource::<PixelSimulationDebug>();
-        app.add_systems(Update, pixel_simulation_debug_ui);
-
+        app.add_systems(Update, (pixel_simulation_debug, pixel_simulation_debug_ui).run_if(in_state(DebugState::ShowAll)));
         app.init_gizmo_group::<ChunkGizmos>();
-        app.add_systems(PostUpdate, (draw_chunk_gizmos, update_pixel_debug_gizmos));
+        app.add_systems(PostUpdate, (draw_chunk_gizmos, update_pixel_debug_gizmos).run_if(in_state(DebugState::ShowAll)));
 }
 
 fn pixel_simulation_debug(
@@ -63,12 +60,16 @@ fn pixel_simulation_debug(
 fn pixel_simulation_debug_ui(
     mut ctx: EguiContexts,
     mut dbg: ResMut<PixelSimulationDebug>,
+    mut dbg_ui: ResMut<PixelSimulationDebugUi>,
     pxl: Res<PixelInteraction>,
 ) {
-    egui::Window::new("Pixel Debug").show(ctx.ctx_mut(),
+    egui::Window::new("Pixel Debug")
+        .open(&mut dbg_ui.show)
+        .show(ctx.ctx_mut(),
         | ui | {
             ui.set_min_width(200.);
             ui.label(format!("Debug info for pixel sim"));
+            ui.label("Toggle Debug window with F1");
             ui.separator();
             ui.label(format!("Current Chunk: {:?}", dbg.chunk_position));
             ui.label(format!("Current Cell: {:?}", dbg.hovered_cell));
@@ -78,6 +79,7 @@ fn pixel_simulation_debug_ui(
             ui.separator();
             ui.label(format!("Amount of chunks/chunk size: {:?}/{:?}", dbg.chunk_amount, dbg.chunk_size));
             ui.checkbox(&mut dbg.show_chunk_borders, "Show Chunks (F2)");
+            ui.label("Toggle Rapier (Physics) Debug Overlay with F3");
         }
     );
 }
