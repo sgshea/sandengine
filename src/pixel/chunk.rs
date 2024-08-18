@@ -8,6 +8,8 @@ use super::{cell::{Cell, PhysicsType}, geometry_helpers::BoundRect};
 pub struct PixelChunk {
     pub current_dirty_rect: BoundRect,
     pub previous_dirty_rect: BoundRect,
+    // Force chunk to re-render while this value counts down to 0
+    pub render_override: u8,
 
     // Chunk position
     pub position: IVec2,
@@ -21,6 +23,7 @@ impl PixelChunk {
 
         PixelChunk {
             position: IVec2 { x: pos_x, y: pos_y },
+            render_override: 0,
             current_dirty_rect: BoundRect {
                     min: IVec2::ZERO,
                     // We iterate over the range of the BoundRect to the end (inclusive) so we need to subtract 1 to not go out of bounds
@@ -32,7 +35,7 @@ impl PixelChunk {
     }
 
     pub fn should_update(&self) -> bool {
-        !self.current_dirty_rect.is_empty()
+        !self.current_dirty_rect.is_empty() || self.render_override > 0
     }
 
     pub fn get_index(&self, x: i32, y: i32) -> usize {
@@ -53,12 +56,20 @@ impl PixelChunk {
     pub fn set_cell(&mut self, x: i32, y: i32, cell: Cell) {
         let idx = self.get_index(x, y);
         self.set_cell_1d(idx, cell);
-        self.current_dirty_rect = self.current_dirty_rect.union_point(&IVec2::new(x, y));
+        if self.current_dirty_rect.is_empty() {
+            self.current_dirty_rect = self.current_dirty_rect.union_point_plus(&IVec2::new(x, y));
+        } else {
+            self.current_dirty_rect = self.current_dirty_rect.union_point(&IVec2::new(x, y));
+        }
     }
 
     pub fn construct_dirty_rect(&mut self, points: &[IVec2]) {
         let new_rect = BoundRect::from_points(points);
         self.current_dirty_rect = new_rect;
+        // Reset override
+        if self.current_dirty_rect.is_empty() && self.render_override > 0 {
+            self.render_override -= 1;
+        }
     }
 
     pub fn swap_rects(&mut self) {

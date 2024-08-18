@@ -1,14 +1,17 @@
 use bevy::{math::vec2, prelude::*};
 use bevy_rapier2d::prelude::*;
-use contour::ContourBuilder;
-use geo::{SimplifyVwPreserve, TriangulateEarcut};
+use contour::{Contour, ContourBuilder};
+use geo::{Area, CoordsIter, SimplifyVwPreserve, TriangulateEarcut};
 
 use crate::pixel::PixelSimulation;
 
 use super::RigidStorage;
 
-// Generate colliders for each chunk
-pub fn generate_colliders(
+/// Generates colliders for the chunks in the pixel simulation
+/// This function will regenerate a collider for each chunk in the simulation and add it to the rigid storage
+/// If the chunk's dirty rectangle has not changed since the last frame, it will not generate a new collider
+/// Chunk collider generate uses a polyline collider created through a simplified marching squares algorithm
+pub fn chunk_collider_generation(
     pixel_sim: Query<&mut PixelSimulation>,
     mut rigid_storage: ResMut<RigidStorage>,
     mut commands: Commands,
@@ -19,10 +22,13 @@ pub fn generate_colliders(
     let chunk_height = world.get_chunk_height();
 
     for (i, chunk) in world.get_chunks().iter().enumerate() {
+        // Skip this chunk if the dirty rect has not changed, keep the existing colliders
+        if !chunk.should_update() {
+            continue;
+        }
+
         // Remove existing colliders
         cleanup_colliders(&mut rigid_storage, i, &mut commands);
-
-        let mut colliders = vec![];
 
         // Apply the contour builder to the chunk
         // This uses the marching squares algorithm to create contours from the chunk data
@@ -34,29 +40,39 @@ pub fn generate_colliders(
                                                 .y_step(1.0);
         let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
 
-        // Simplify and triangulate each contours
+        // Create polyline colliders for each contour
+        let mut colliders: Vec<Collider> = vec![];
         for contour in contours {
-            // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
-            let geometry = contour.geometry().simplify_vw_preserve(&1.5);
-
-            for poly in geometry {
-                // Triangulate the polygon using the earcut algorithm and place into collider
-                let triangles = convert_polygon_to_triangles(poly);
-                for triangle in triangles.chunks(3) {
-                    let collider = Collider::triangle(triangle[0], triangle[1], triangle[2]);
-                    colliders.push((Vec2::ZERO, 0.0, collider));
-                }
-            }
+            colliders.extend(create_polyline_colliders(&contour));
         }
+
+        // Push colliders, if any were generated, to the storage
         if !colliders.is_empty() {
-            // Combine all colliders into a single collider
-            let combined = Collider::compound(colliders);
-            let id = commands.spawn(combined).insert(ContactSkin(0.1)).id();
-            rigid_storage.colliders[i] = Some(vec![id]);
+            let mut id = vec![];
+            for collider in colliders {
+                id.push(commands.spawn(collider).id())
+            }
+            rigid_storage.colliders[i] = Some(id);
         } else {
             rigid_storage.colliders[i] = None;
         }
     }
+}
+
+/// Create polyline colliders from a contour
+fn create_polyline_colliders(contour: &Contour) -> Vec<Collider> {
+    let geometry = contour.geometry().simplify_vw_preserve(&1.5);
+
+    let mut edges = vec![];
+    for poly in geometry {
+        // Try to skip polygons that are too small
+        if poly.unsigned_area() > 2.5 {
+            let edge = poly.exterior_coords_iter().map(|p| Vec2::new(p.x as f32, p.y as f32));
+            edges.push(Collider::polyline(edge.collect(), None));
+        }
+    }
+
+    edges
 }
 
 // Generate a single collider from values

@@ -84,6 +84,14 @@ impl PixelWorld {
         None
     }
 
+    /// Gets all the chunks that should update and returns their positions
+    fn all_chunk_pos_should_update(&self) -> Vec<IVec2> {
+        self.chunks.iter()
+            .filter(|&(_, chunk)| chunk.should_update())
+            .map(|(&pos, _)| pos)
+            .collect()
+    }
+
     fn chunk_mut(&mut self, position: IVec2) -> Option<&mut PixelChunk> {
         self.chunks.get_mut(&position)
     }
@@ -116,20 +124,24 @@ impl PixelWorld {
         false
     }
 
-    pub fn set_cell(&mut self, position: IVec2, cell: Cell) {
+    /// Sets the value of a cell in this chunk, if it exists.
+    /// Makes sure that the chunk is marked as dirty if it wasn't already.
+    pub fn set_cell_external(&mut self, position: IVec2, cell: Cell) {
         let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(position)) else {
             return;
         };
 
         let local = Self::cell_to_position_in_chunk(position);
         chunk.set_cell(local.x, local.y, cell);
+
+        chunk.render_override = 3;
     }
 
     // Main update function
     pub fn update(&mut self) {
         let taskpool = ComputeTaskPool::get();
 
-        let all_pos: Vec<IVec2> = self.chunks.keys().map(|pos| *pos).collect::<Vec<IVec2>>();
+        let all_pos = self.all_chunk_pos_should_update();
 
         // Contains all the new updates, used to contruct dirty rects for next frame
         let mut dirty_rect_updates: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
@@ -144,35 +156,35 @@ impl PixelWorld {
 
         for iter in iterations {
             all_pos.iter().for_each(|pos| {
-                let xx = (pos.x + iter.0) % 2 == 0;
-                let yy = (pos.y + iter.1) % 2 == 0;
+                    let xx = (pos.x + iter.0) % 2 == 0;
+                    let yy = (pos.y + iter.1) % 2 == 0;
                 if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
-                    let new_updates = {
-                        let arr = DIRECTIONS
-                        .map(|dir|{
-                            let chunk = self.chunk_mut(*pos + dir);
-                            match chunk {
-                                Some(c) => {
-                                    let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
-                                    Some(cell_chunk)
-                                },
-                                None => None,
-                            }
-                        }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
+                        let new_updates = {
+                            let arr = DIRECTIONS
+                            .map(|dir|{
+                                let chunk = self.chunk_mut(*pos + dir);
+                                match chunk {
+                                    Some(c) => {
+                                        let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
+                                        Some(cell_chunk)
+                                    },
+                                    None => None,
+                                }
+                            }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
 
-                        // Simulate a chunk by creating the context and push into the taskpool for simulation
-                        let mut scc = SimulationChunkContext::new(
-                            *pos,
-                            arr.try_into().unwrap(),
-                        );
+                            // Simulate a chunk by creating the context and push into the taskpool for simulation
+                            let mut scc = SimulationChunkContext::new(
+                                *pos,
+                                arr.try_into().unwrap(),
+                            );
                         taskpool.scope(|s| {
                             s.spawn(async move {
-                                scc.simulate()
+                            scc.simulate()
                             })
                         })
-                    };
+                        };
 
-                    // Push new updates into dirty rect updates
+                        // Push new updates into dirty rect updates
                     for i in new_updates {
                         for (position, cells) in i {
                             if let Some(existing) = dirty_rect_updates.get_mut(&position) {

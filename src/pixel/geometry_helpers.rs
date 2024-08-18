@@ -93,6 +93,28 @@ impl BoundRect {
         }
     }
 
+    /// Unions a point plus expands the bounds by 1 in all directions
+    pub fn union_point_plus(&self, point: &IVec2) -> Self {
+        let mut min = *point - IVec2::ONE;
+        let mut max = *point + IVec2::ONE;
+
+        // Do bounds checking
+        if min.x < 0 {
+            min.x = 0;
+        }
+        if min.y < 0 {
+            min.y = 0;
+        }
+        if max.x > self.max.x {
+            max.x = self.max.x;
+        }
+        if max.y > self.max.y {
+            max.y = self.max.y;
+        }
+
+        Self { min, max }
+    }
+
     pub fn contains(&self, point: &IVec2) -> bool {
         point.x >= self.min.x && point.y >= self.min.y && point.x <= self.max.x && point.y <= self.max.y
     }

@@ -14,8 +14,8 @@ struct ChunkDisplayComponent {
     pub chunk: IVec2,
 }
 
-// Creates the chunk textures for each chunk
-// Can do in runtime (so that we can load/unload chunks later)
+/// Creates the chunk textures for each chunk
+/// Can do in runtime (so that we can load/unload chunks later)
 fn create_chunk_displays(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,

@@ -70,7 +70,7 @@ fn place_cells(
             if (x * x) + (y * y) > amt_to_place_quarter * amt_to_place_quarter {
                 continue;
             }
-            world.set_cell(position + IVec2 { x, y }, Cell::from(cell_type));
+            world.set_cell_external(position + IVec2 { x, y }, Cell::from(cell_type));
         }
     }
 }

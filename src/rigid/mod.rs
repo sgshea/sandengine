@@ -11,7 +11,7 @@ use bevy_rapier2d::prelude::*;
 use bevy_tnua::{builtins::{TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{TnuaCrouchEnforcer, TnuaCrouchEnforcerPlugin, TnuaSimpleAirActionsCounter}, controller::{TnuaControllerBundle, TnuaControllerPlugin}, math::Vector3, TnuaGhostSensor, TnuaToggle, TnuaUserControlsSystemSet};
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
-use collider_generation::generate_colliders;
+use collider_generation::chunk_collider_generation;
 use rigidbodies::{load_rigidbody_image, RigidBodyImageHandle};
 
 use super::CHUNKS;
@@ -22,7 +22,7 @@ impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(RigidStorage::default())
             .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
-            .add_systems(FixedUpdate, generate_colliders)
+            .add_systems(FixedPostUpdate, chunk_collider_generation)
             .add_plugins((
                 TnuaRapier2dPlugin::new(FixedUpdate),
                 TnuaControllerPlugin::new(FixedUpdate),

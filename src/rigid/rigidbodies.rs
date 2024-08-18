@@ -96,7 +96,6 @@ pub fn add_non_dynamic_rigidbody(
         RigidBody::Dynamic,
         ColliderMassProperties::default(),
         Restitution::coefficient(0.7),
-        ContactSkin(0.5),
     ));
 }
 
