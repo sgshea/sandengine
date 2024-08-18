@@ -7,7 +7,6 @@ mod dev_tools;
 mod states;
 
 use bevy::{prelude::*, window::PresentMode};
-use bevy_mod_picking::prelude::*;
 use bevy_egui::EguiPlugin;
 use pixel::PixelPlugin;
 use states::DebugState;
@@ -32,7 +31,6 @@ impl Plugin for AppPlugin {
                 }),
                 ..default()}
             ).set(ImagePlugin::default_nearest()),
-            DefaultPickingPlugins,
             EguiPlugin,
             dev_tools::plugin,
         ))

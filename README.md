@@ -2,20 +2,17 @@
 Falling sand engine written in rust with bevy.
 
 ## Features
-High performance sand simulation, using multithreaded and calculated by chunk.
-
-- Rigidbodies by integrating rapier physics engine
+- Chunked sand simulation in order to use multithreading and 'dirty rectangle' optimization
+- Integration with Rapier physics engine for rigid body physics (currently only 1-way interaction with sand simulation)
 
 # Performance
 See [performance.md](./performance.md)
 
-# Bulding
-Build instructions contained in the [justfile](./justfile)
+## Builds
+Release builds are built through actions and can be found on the releases page.
+The web version is uploaded onto the GitHub pages at https://sgshea.github.io/sandengine/
 
-## For Web (WASM)
-Building requires `wasm-bindgen-cli` and an http server.
-- Run `just install-wasm-deps` to get both
-- Run `just build-run-wasm` to build and run the wasm build
+Locally, the project can be run with `cargo run` or `cargo run --release`
 
 # License
 Apache 2.0: see [LICENSE](./LICENSE)

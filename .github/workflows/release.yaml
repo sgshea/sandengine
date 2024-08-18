@@ -93,9 +93,6 @@ jobs:
             echo 'MACOSX_DEPLOYMENT_TARGET=11.0' >> "${GITHUB_ENV}" # MacOS 11.0 Big Sur is the first version to support universal binaries.
             echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "${GITHUB_ENV}"
           fi
-          if [ '${{ matrix.platform }}' == 'web' ]; then
-            echo 'RUSTFLAGS=--cfg=web_sys_unstable_apis' >> "${GITHUB_ENV}" # Needed for egui on wasm
-          fi
 
       - name: Checkout repository
         uses: actions/checkout@v4
