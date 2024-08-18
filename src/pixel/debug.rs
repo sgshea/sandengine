@@ -7,11 +7,11 @@ use bevy::math::IVec2;
 use bevy_egui::{egui, EguiContexts};
 
 use crate::dev_tools::PixelSimulationDebugUi;
+use crate::input::InteractionInformation;
 use crate::states::DebugState;
 use crate::{CHUNK_SIZE, WORLD_SIZE};
 
 use super::cell::Cell;
-use super::interaction::PixelInteraction;
 use super::world::PixelWorld;
 use super::PixelSimulation;
 
@@ -43,11 +43,11 @@ pub(super) fn plugin(app: &mut App) {
 fn pixel_simulation_debug(
     sim: Query<&mut PixelSimulation>,
     mut dbg: ResMut<PixelSimulationDebug>,
-    pxl: Res<PixelInteraction>,
+    int: Res<InteractionInformation>,
 ) {
     let world = &sim.single().world;
 
-    let cell_pos = pxl.hovered_position;
+    let cell_pos = int.mouse_position.as_ivec2();
     dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(cell_pos);
     dbg.chunk_position = PixelWorld::cell_to_chunk_position(cell_pos);
     dbg.hovered_cell = world.get_cell(cell_pos);
@@ -61,7 +61,7 @@ fn pixel_simulation_debug_ui(
     mut ctx: EguiContexts,
     mut dbg: ResMut<PixelSimulationDebug>,
     mut dbg_ui: ResMut<PixelSimulationDebugUi>,
-    pxl: Res<PixelInteraction>,
+    int: Res<InteractionInformation>,
 ) {
     egui::Window::new("Pixel Debug")
         .open(&mut dbg_ui.show)
@@ -74,7 +74,7 @@ fn pixel_simulation_debug_ui(
             ui.label(format!("Current Chunk: {:?}", dbg.chunk_position));
             ui.label(format!("Current Cell: {:?}", dbg.hovered_cell));
             ui.label(format!("Inside dirty rect?: {:?}", dbg.inside_dirty_rect));
-            ui.label(format!("Cell position in world: {:?}", pxl.hovered_position));
+            ui.label(format!("Cell position in world: {:?}", int.mouse_position.as_ivec2()));
             ui.label(format!("Cell position in chunk: {:?}", dbg.position_in_chunk));
             ui.separator();
             ui.label(format!("Amount of chunks/chunk size: {:?}/{:?}", dbg.chunk_amount, dbg.chunk_size));

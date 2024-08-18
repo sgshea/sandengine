@@ -3,17 +3,17 @@
 use bevy::prelude::*;
 
 use bevy::math::IVec2;
-use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
+use crate::input::InteractionInformation;
+
 use super::cell::{Cell, CellType};
+use super::world::PixelWorld;
 use super::PixelSimulation;
 
 #[derive(Resource)]
 pub struct PixelInteraction {
-    // Hovered position in world coordinates
-    pub hovered_position: IVec2,
     // Type of cell to be placed on click
     pub place_cell_type: CellType,
     // Amount of cell to place
@@ -23,7 +23,6 @@ pub struct PixelInteraction {
 impl Default for PixelInteraction {
     fn default() -> Self {
         Self {
-            hovered_position: IVec2::ZERO,
             place_cell_amount: 8,
             place_cell_type: CellType::Sand,
         }
@@ -31,29 +30,9 @@ impl Default for PixelInteraction {
 }
 
 pub(super) fn plugin(app: &mut App) {
-        app.add_systems(Update, get_position);
-
         app.init_resource::<PixelInteraction>();
         app.add_systems(Update, pixel_interaction_config);
         app.add_systems(FixedPostUpdate, handle_mouse_input);
-}
-
-fn get_position(
-    mut pxl: ResMut<PixelInteraction>,
-    primary_window: Query<&Window, With<PrimaryWindow>>,
-    camera: Query<(&Camera, &GlobalTransform)>,
-) {
-    let cursor_screen_position = primary_window.single().cursor_position();
-
-    if cursor_screen_position.is_none() {
-        return
-    }
-    let (cam, trans) = camera.single();
-
-    let world_pos = cam.viewport_to_world_2d(trans, cursor_screen_position.unwrap()).unwrap();
-
-    let cell_pos = world_pos.as_ivec2();
-    pxl.hovered_position = cell_pos;
 }
 
 fn pixel_interaction_config(
@@ -65,31 +44,26 @@ fn pixel_interaction_config(
             ui.set_min_width(200.);
             ui.label("Controls:");
             ui.label("Left click to place the selected cell type below");
-            ui.label("Right click to erase the selected cell type");
-            ui.label("Middle click to place a rigid body box object");
+            ui.label("Hold left control and press left click to erase the selected cell type or select empty");
             ui.separator();
             for (cell_type, name) in CellType::iter().zip(CellType::VARIANTS.iter()) {
                 ui.radio_value(&mut pxl.place_cell_type, cell_type, *name);
             }
 
-            ui.add(egui::Slider::new(&mut pxl.place_cell_amount, 8..=100).text("Amount to spawn"));
-
-            ui.separator();
-            ui.label("Press F1 to toggle debug window and Rapier physics debug renderer");
+            ui.add(egui::Slider::new(&mut pxl.place_cell_amount, 8..=100).text("Size of brush"));
         }
     );
 }
 
 // Intended to be called with cell type
 fn place_cells(
-    mut sim: Query<&mut PixelSimulation>,
+    world: &mut PixelWorld,
     position: IVec2,
     amount: i32,
     cell_type: CellType,
 ) {
     let amt_to_place_quarter = amount / 4;
     let amt_to_place_half = amount / 2;
-    let world = &mut sim.single_mut().world;
     for x in -amt_to_place_half..=amt_to_place_half {
         for y in -amt_to_place_half..amt_to_place_half {
             // Make circle
@@ -103,13 +77,22 @@ fn place_cells(
 
 fn handle_mouse_input(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
-    sim: Query<&mut PixelSimulation>,
+    keyboard_buttons: Res<ButtonInput<KeyCode>>,
+    mut sim: Query<&mut PixelSimulation>,
     pxl: ResMut<PixelInteraction>,
+    int: Res<InteractionInformation>,
 ) {
+    // Don't do anything if we are hovering over UI
+    if int.hovering_ui { return; }
+
+    let world = &mut sim.single_mut().world;
+
     if mouse_buttons.pressed(MouseButton::Left) {
-        place_cells(sim, pxl.hovered_position, pxl.place_cell_amount, pxl.place_cell_type);
-    }
-    else if mouse_buttons.pressed(MouseButton::Right) { 
-        place_cells(sim, pxl.hovered_position, pxl.place_cell_amount, CellType::Empty);
+        // Delete cells if control is held
+        if keyboard_buttons.pressed(KeyCode::ControlLeft) {
+            place_cells(world, int.mouse_position.as_ivec2(), pxl.place_cell_amount, CellType::Empty);
+        } else {
+            place_cells(world, int.mouse_position.as_ivec2(), pxl.place_cell_amount, pxl.place_cell_type);
+        }
     }
 }

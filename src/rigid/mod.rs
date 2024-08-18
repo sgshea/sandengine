@@ -1,6 +1,7 @@
 mod collider_generation;
 mod character_control_tnua;
 mod rigidbodies;
+mod interaction;
 
 use std::f32::consts::FRAC_PI_4;
 
@@ -11,9 +12,7 @@ use bevy_tnua::{builtins::{TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
 use collider_generation::generate_colliders;
-use rigidbodies::{add_rigidbody, load_rigidbody_image, RigidBodyImageHandle};
-
-use crate::pixel::interaction::PixelInteraction;
+use rigidbodies::{load_rigidbody_image, RigidBodyImageHandle};
 
 use super::CHUNKS;
 
@@ -38,11 +37,11 @@ impl Plugin for SandEngineRigidPlugin {
                 handle: None,
             })
             .add_systems(Startup, load_rigidbody_image)
-            .add_systems(Update, mouse_input_spawn_rigidbody)
             .add_systems(
                 FixedUpdate.intern(),
                 apply_platformer_controls.in_set(TnuaUserControlsSystemSet),
-            );
+            )
+            .add_plugins(interaction::plugin);
     }
 }
 
@@ -121,17 +120,4 @@ fn setup_player(mut commands: Commands) {
     // need to cast a shape - which is physics-engine specific. We set the shape using a
     // component.
     cmd.insert(TnuaRapier2dSensorShape(Collider::ball(0.70)));
-}
-
-fn mouse_input_spawn_rigidbody(
-    commands: Commands,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
-    pxl: Res<PixelInteraction>,
-
-    rigidbody_image: Res<RigidBodyImageHandle>,
-    images: Res<Assets<Image>>,
-) {
-    if mouse_button_input.just_pressed(MouseButton::Middle) {
-        add_rigidbody(commands, images, rigidbody_image, pxl.hovered_position);
-    }
 }

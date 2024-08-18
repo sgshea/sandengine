@@ -6,6 +6,10 @@ use crate::states::DebugState;
 pub(super) fn plugin(app: &mut App) {
         app
             .add_plugins(RapierDebugRenderPlugin::default())
+            .add_systems(Startup, |mut dbg_rnd_ctx: ResMut<DebugRenderContext>| {
+                // Disable rapier debug rendering by default
+                dbg_rnd_ctx.enabled = false;
+            })
             .init_resource::<PixelSimulationDebugUi>()
             .add_systems(Update, handle_keyboard_input);
 }
