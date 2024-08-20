@@ -6,12 +6,15 @@ use strum::{EnumIter, IntoEnumIterator, VariantNames};
 
 use crate::input::InteractionInformation;
 
-use super::rigidbodies::{add_non_dynamic_rigidbody, RigidBodyImageHandle};
+use super::{dynamic_entity::{add_dpe, RigidBodyImageHandle}, rigidbodies::add_non_dynamic_rigidbody};
 
 #[derive(Resource, Default)]
 pub struct RigidInteraction {
     // Type of rigid body to be placed on click
     pub place_rigid_type: PlaceableRigidBodies,
+
+    // Type of dynamic physics entity to be placed on click
+    pub place_dynamic_entity_type: PlaceableDynamicEntities,
 }
 
 #[derive(Debug, Default, EnumIter, VariantNames, PartialEq, Eq, Clone, Copy)]
@@ -19,6 +22,13 @@ pub enum PlaceableRigidBodies {
     None,
     #[default]
     Ball,
+    Box,
+}
+
+#[derive(Debug, Default, EnumIter, VariantNames, PartialEq, Eq, Clone, Copy)]
+pub enum PlaceableDynamicEntities {
+    None,
+    #[default]
     Box,
 }
 
@@ -40,9 +50,11 @@ fn rigid_interaction_config(
             ui.separator();
             for (rigid_type, name) in PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter()) {
                 ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
-
             }
             ui.separator();
+            for (dpe_type, name) in PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter()) {
+                ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
+            }
             ui.label("Press F1 to toggle debug window");
         }
     );
@@ -53,10 +65,19 @@ fn handle_input(
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<ColorMaterial>>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
+    keyboard_buttons: Res<ButtonInput<KeyCode>>,
     rgd: Res<RigidInteraction>,
     int: Res<InteractionInformation>,
+
+    images: Res<Assets<Image>>,
+    rigidbody_image: Res<RigidBodyImageHandle>,
 ) {
     if !int.hovering_ui && mouse_button_input.just_released(MouseButton::Right) {
-        add_non_dynamic_rigidbody(commands, meshes, materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+        // Place DPE with control held
+        if keyboard_buttons.pressed(KeyCode::ControlLeft) {
+            add_dpe(commands, images, int.mouse_position, rigidbody_image);
+        } else {
+            add_non_dynamic_rigidbody(commands, meshes, materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+        }
     }
 }

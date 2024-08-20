@@ -1,6 +1,7 @@
 mod collider_generation;
 mod character_control_tnua;
 mod rigidbodies;
+mod dynamic_entity;
 mod interaction;
 
 use std::f32::consts::FRAC_PI_4;
@@ -12,7 +13,7 @@ use bevy_tnua::{builtins::{TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
 use collider_generation::chunk_collider_generation;
-use rigidbodies::{load_rigidbody_image, RigidBodyImageHandle};
+use dynamic_entity::{load_rigidbody_image, RigidBodyImageHandle};
 
 use super::CHUNKS;
 

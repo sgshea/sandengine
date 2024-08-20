@@ -1,7 +1,7 @@
-use bevy::{math::vec2, prelude::*};
+use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use contour::{Contour, ContourBuilder};
-use geo::{Area, CoordsIter, SimplifyVwPreserve, TriangulateEarcut};
+use geo::{Area, CoordsIter, SimplifyVwPreserve};
 
 use crate::pixel::PixelSimulation;
 
@@ -75,36 +75,33 @@ fn create_polyline_colliders(contour: &Contour) -> Vec<Collider> {
     edges
 }
 
-// Generate a single collider from values
-// Can be used on an image for example
-pub fn create_collider(values: &[f64], width: u32, height: u32) -> Option<Collider> {
-    let mut colliders = vec![];
+/// Use rapier's convex_decomposition
+fn create_convex_collider(contour: &Contour) -> Collider {
+    let geometry = contour.geometry().simplify_vw_preserve(&1.5);
+    let mut points: Vec<Vec2> = vec![];
 
-    // Apply the contour builder to the chunk
-    // This uses the marching squares algorithm to create contours from the chunk data
+    for poly in geometry.iter() {
+        points.extend(poly.exterior_coords_iter().map(|p| Vec2::new(p.x as f32, p.y as f32)).collect::<Vec<_>>());
+    }
+
+    // We know that the points are sequentially ordered in the contour so we can create indices simply by counting to the next one
+    let indices: Vec<[u32; 2]> = (0..points.len() - 1).map(|i| [i as u32, i as u32 + 1]).collect();
+
+    Collider::convex_decomposition(&points, &indices)
+}
+
+/// Creates a single compound polyline collider from values
+pub fn create_convex_collider_from_values(values: &[f64], width: f32, height: f32) -> Option<Collider> {
+
     let contour_builder = ContourBuilder::new(width as usize, height as usize, false);
     let contours = contour_builder.contours(values, &[0.5]).expect("Failed to generate contour");
 
-    // Simplify and triangulate each contours
-    for contour in contours {
-        // simplify (Ramer-Douglas-Peucker algorithm) and simplify-vw-preserve (Visvalingam-Whyatt algorithm) are two candidates for simplifying the contours
-        // RDP is faster but VW is better at preserving the shape (creating better colliders)
-        // Higher epsilon values will simplify more (remove more points)
-        let geometry = contour.geometry().simplify_vw_preserve(&1.5);
-
-        for poly in geometry {
-            // Triangulate the polygon using the earcut algorithm and place into collider
-            let triangles = convert_polygon_to_triangles(poly);
-            for triangle in triangles.chunks(3) {
-                let collider = Collider::triangle(triangle[0], triangle[1], triangle[2]);
-                colliders.push((Vec2::ZERO, 0.0, collider));
-            }
-        }
+    // Expect there to be only one contour
+    let contour = contours.first();
+    if contour.is_some() {
+        return Some(create_convex_collider(contour.unwrap()))
     }
-    match colliders.is_empty() {
-        true => None,
-        false => Some(Collider::compound(colliders)),
-    }
+    None
 }
 
 // Remove colliders inside a chunk
@@ -119,15 +116,4 @@ pub fn cleanup_colliders(
         }
     }
     rigid_storage.colliders[i] = None;
-}
-
-fn convert_polygon_to_triangles(polygon: geo::Polygon<f64>) -> Vec<Vec2> {
-    let mut tris = Vec::new();
-    let triangles = polygon.earcut_triangles();
-    for triangle in triangles {
-        tris.push(vec2(triangle.0.x as f32, triangle.0.y as f32));
-        tris.push(vec2(triangle.1.x as f32, triangle.1.y as f32));
-        tris.push(vec2(triangle.2.x as f32, triangle.2.y as f32));
-    }
-    tris
 }
