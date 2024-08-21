@@ -6,6 +6,8 @@ use crate::{pixel::chunk_handler::SimulationChunkContext, CHUNK_SIZE};
 
 use super::{cell::Cell, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS}};
 
+use rand::prelude::SliceRandom;
+
 pub struct PixelWorld {
     c_height: i32,
     c_width: i32,
@@ -152,7 +154,11 @@ impl PixelWorld {
             }
         }
 
-        let iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
+        // Shuffling the order of updates to avoid bias
+        // It makes large amounts of movements between chunks feel a bit more natural instead of favoring one direction of movement
+        let mut rng = rand::thread_rng();
+        let mut iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
+        iterations.shuffle(&mut rng);
 
         for iter in iterations {
             all_pos.iter().for_each(|pos| {

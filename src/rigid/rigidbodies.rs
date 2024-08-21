@@ -5,9 +5,9 @@ use super::interaction::PlaceableRigidBodies;
 
 // Add a simple ball or box rigidbody to the world
 pub fn add_non_dynamic_rigidbody(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<ColorMaterial>>,
     position: IVec2,
     rigid_type: PlaceableRigidBodies,
 ) {

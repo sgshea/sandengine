@@ -61,9 +61,9 @@ fn rigid_interaction_config(
 }
 
 fn handle_input(
-    commands: Commands,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<ColorMaterial>>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
     mouse_button_input: Res<ButtonInput<MouseButton>>,
     keyboard_buttons: Res<ButtonInput<KeyCode>>,
     rgd: Res<RigidInteraction>,
@@ -75,9 +75,23 @@ fn handle_input(
     if !int.hovering_ui && mouse_button_input.just_released(MouseButton::Right) {
         // Place DPE with control held
         if keyboard_buttons.pressed(KeyCode::ControlLeft) {
-            add_dpe(commands, images, int.mouse_position, rigidbody_image);
+            if keyboard_buttons.pressed(KeyCode::ShiftLeft) {
+                // Add 10
+                for _ in 0..10 {
+                    add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
+                }
+            } else {
+                add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
+            }
         } else {
-            add_non_dynamic_rigidbody(commands, meshes, materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+            if keyboard_buttons.pressed(KeyCode::ShiftLeft) {
+                // Add 10
+                for _ in 0..10 {
+                    add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+                }
+            } else {
+                add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+            }
         }
     }
 }

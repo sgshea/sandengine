@@ -53,10 +53,10 @@ impl DynamicPhysicsEntity {
 }
 
 pub fn add_dpe(
-    mut commands: Commands,
-    images: Res<Assets<Image>>,
+    commands: &mut Commands,
+    images: &Res<Assets<Image>>,
     position: Vec2,
-    rigidbody_image: Res<RigidBodyImageHandle>,
+    rigidbody_image: &Res<RigidBodyImageHandle>,
 ) {
     let image_handle = rigidbody_image.handle.clone().unwrap();
     let image = images.get(&image_handle).unwrap();
