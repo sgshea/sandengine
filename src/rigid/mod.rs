@@ -13,7 +13,9 @@ use bevy_tnua::{builtins::{TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
 use collider_generation::chunk_collider_generation;
-use dynamic_entity::{load_rigidbody_image, RigidBodyImageHandle};
+use dynamic_entity::{fill_pixel_component, load_rigidbody_image, unfill_pixel_component, RigidBodyImageHandle};
+
+use crate::pixel::update_pixel_simulation;
 
 use super::CHUNKS;
 
@@ -41,6 +43,13 @@ impl Plugin for SandEngineRigidPlugin {
             .add_systems(
                 FixedUpdate.intern(),
                 apply_platformer_controls.in_set(TnuaUserControlsSystemSet),
+            )
+            .add_systems(
+                FixedUpdate,
+                (
+                    fill_pixel_component.before(update_pixel_simulation),
+                    unfill_pixel_component.after(update_pixel_simulation),
+                )
             )
             .add_plugins(interaction::plugin);
     }

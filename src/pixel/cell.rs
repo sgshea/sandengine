@@ -1,4 +1,3 @@
-use bevy_egui::egui::epaint::color;
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
@@ -110,10 +109,18 @@ impl Cell {
         }
     }
 
-    pub fn with_cell_and_color(cell_type: CellType, color: [u8; 4]) -> Self {
+    pub fn object() -> Self {
+        Self {
+            color: [0, 0, 0, 255],
+            physics: PhysicsType::RigidBody(CellType::Empty),
+            updated: true,
+        }
+    }
+
+    pub fn with_cell_and_color_rigidbody(cell_type: CellType, color: [u8; 4]) -> Self {
         Self {
             color,
-            physics: PhysicsType::from(cell_type),
+            physics: PhysicsType::RigidBody(cell_type),
             updated: false,
         }
     }

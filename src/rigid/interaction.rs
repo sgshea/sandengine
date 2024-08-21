@@ -45,15 +45,14 @@ fn rigid_interaction_config(
     egui::Window::new("Rigid Body Simulation").show(ctx.ctx_mut(),
         | ui | {
             ui.set_min_width(100.);
-            ui.label("Controls:");
-            ui.label("Right click to place the selected type");
-            ui.separator();
-            for (rigid_type, name) in PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter()) {
-                ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
-            }
-            ui.separator();
+            ui.label("Right Click to place a Dynamic Physics Body");
             for (dpe_type, name) in PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter()) {
                 ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
+            }
+            ui.separator();
+            ui.label("L-CTRL + Right Click to place a generic physics body");
+            for (rigid_type, name) in PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter()) {
+                ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
             }
             ui.label("Press F1 to toggle debug window");
         }
@@ -78,19 +77,19 @@ fn handle_input(
             if keyboard_buttons.pressed(KeyCode::ShiftLeft) {
                 // Add 10
                 for _ in 0..10 {
-                    add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
+                    add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
                 }
             } else {
-                add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
+                add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
             }
         } else {
             if keyboard_buttons.pressed(KeyCode::ShiftLeft) {
                 // Add 10
                 for _ in 0..10 {
-                    add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+                    add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
                 }
             } else {
-                add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+                add_dpe(&mut commands, &images, int.mouse_position, &rigidbody_image);
             }
         }
     }

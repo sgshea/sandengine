@@ -66,7 +66,7 @@ fn setup_pixel_simulation(
     ));
 }
 
-fn update_pixel_simulation(
+pub fn update_pixel_simulation(
     mut query: Query<&mut PixelSimulation>,
 ) {
     query.single_mut().world.update();

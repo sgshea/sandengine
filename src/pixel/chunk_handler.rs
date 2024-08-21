@@ -406,6 +406,7 @@ impl SimulationChunkContext<'_> {
         position: IVec2,
     ) -> Option<Cell> {
         let mut current = self.get_cell(position).clone();
+
         if current.updated {
             return None
         } else {
