@@ -1,6 +1,8 @@
 use rand::Rng;
 use strum::{EnumIter, VariantNames};
 
+use crate::particles::particle::Particle;
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cell {
     pub color: [u8; 4],
@@ -38,6 +40,16 @@ pub(crate) enum PhysicsType {
 }
 
 impl CellType {
+    pub fn cell_mass(&self) -> f64 {
+        match self {
+            CellType::Empty => 0.0,
+            CellType::Sand => 1.0,
+            CellType::Dirt => 1.5,
+            CellType::Stone => 3.0,
+            CellType::Water => 1.0,
+            CellType::Smoke => 0.1,
+        }
+    }
 
     pub fn cell_color(&self) -> [u8; 4] {
         let mut trng = rand::thread_rng();
@@ -83,6 +95,19 @@ impl CellType {
                     150,
                 ]
             },
+        }
+    }
+}
+
+impl From<PhysicsType> for CellType {
+    fn from(value: PhysicsType) -> Self {
+        match value {
+            PhysicsType::Empty => CellType::Empty,
+            PhysicsType::SoftSolid(cell_type) => cell_type,
+            PhysicsType::HardSolid(cell_type) => cell_type,
+            PhysicsType::Liquid(cell_type) => cell_type,
+            PhysicsType::Gas(cell_type) => cell_type,
+            PhysicsType::RigidBody(cell_type) => cell_type,
         }
     }
 }
@@ -133,6 +158,16 @@ impl Cell {
 impl From<CellType> for Cell {
     fn from(value: CellType) -> Self {
         Cell::new(value)
+    }
+}
+
+impl From<Particle> for Cell {
+    fn from(value: Particle) -> Self {
+        Self {
+            color: value.color,
+            physics: value.physics,
+            updated: false
+        }
     }
 }
 

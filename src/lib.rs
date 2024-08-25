@@ -1,4 +1,5 @@
 mod pixel;
+mod particles;
 mod rigid;
 
 mod input;
@@ -8,6 +9,7 @@ mod states;
 
 use bevy::{prelude::*, window::PresentMode};
 use bevy_egui::EguiPlugin;
+use particles::ParticlePlugin;
 use pixel::PixelPlugin;
 use states::DebugState;
 
@@ -37,7 +39,8 @@ impl Plugin for AppPlugin {
         .init_state::<DebugState>()
         .insert_resource(Time::<Fixed>::from_hz(64.))
         .add_plugins(input::plugin)
-        .add_plugins(PixelPlugin);
+        .add_plugins(PixelPlugin)
+        .add_plugins(ParticlePlugin);
     }
 }
 
