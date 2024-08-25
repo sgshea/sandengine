@@ -3,7 +3,7 @@
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_rapier2d::prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity};
 
-use crate::pixel::{cell::{Cell, CellType, PhysicsType}, PixelSimulation};
+use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, PixelSimulation}};
 
 use super::collider_generation::create_convex_collider_from_values;
 
@@ -128,6 +128,7 @@ pub fn load_rigidbody_image(
 
 /// Fill the world with temporary cells based on the properties of the PixelComponents
 pub fn fill_pixel_component(
+    mut commands: Commands,
     mut sim: Query<&mut PixelSimulation>,
     mut dpe: Query<(&Transform, &mut PixelComponent, &Velocity, &ReadMassProperties)>,
 ) {
@@ -158,18 +159,19 @@ pub fn fill_pixel_component(
                         // Once we have finer logic we might be able to remove this but for now it's necessary:
                         // Because the dpe is rendered through image and not the internal pixel simulation, we need to ensure cells will not be overwritten when
                         // only a small amount of the component is inside a cell
-                        let mut should_destroy_cell = true;
+                        let mut should_destroy_cell = false;
                         match PhysicsType::from(
                             // Get the type of the cell in the world, if it does not exist (dpe may be out of pixel world bounds), treat it as empty
                             if let Some(cell) = w_cell { cell.physics } else { PhysicsType::Empty },
                         ) {
                             PhysicsType::Empty => should_destroy_cell = true,
-                            PhysicsType::SoftSolid(_) | PhysicsType::Liquid(_) => {
+                            PhysicsType::SoftSolid(cell_type) | PhysicsType::Liquid(cell_type) => {
                                 // Calculate the center of mass and the velocity at that point on the dpe
-                                // let center_of_mass = mass.local_center_of_mass + transform.translation.xy();
-                                // let velocity_at_point = velocity.linear_velocity_at_point(pos.as_vec2(), center_of_mass);
+                                let center_of_mass = mass.local_center_of_mass + transform.translation.xy();
+                                let velocity_at_point = velocity.linear_velocity_at_point(pos.as_vec2(), center_of_mass);
+                                let normalized_velocity = velocity_at_point.normalize_or_zero() * (velocity_at_point.length() * mass.mass / 1000.);
 
-                                // TODO: Spawn particle here
+                                spawn_particle(&mut commands, &Cell::from(cell_type), normalized_velocity, pos.as_vec2());
                                 should_destroy_cell = true;
                             }
                             _ => {},

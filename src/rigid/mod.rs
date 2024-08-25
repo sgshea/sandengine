@@ -1,7 +1,7 @@
 mod collider_generation;
 mod character_control_tnua;
 mod rigidbodies;
-mod dynamic_entity;
+pub mod dynamic_entity;
 mod interaction;
 
 use std::f32::consts::FRAC_PI_4;
