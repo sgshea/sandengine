@@ -1,6 +1,6 @@
 pub mod particle;
 
-use bevy::prelude::*;
+use bevy::{math::NormedVectorSpace, prelude::*};
 use particle::{Particle, PARTICLE_GRAVITY};
 
 use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld, PixelSimulation}, rigid::dynamic_entity::unfill_pixel_component};
@@ -59,35 +59,34 @@ fn apply_velocity(particle: &mut Particle, transform: &mut Transform, world: &mu
         _ => particle.velocity.y -= PARTICLE_GRAVITY,
     };
 
-    let vector_length = particle.velocity.length();
-    if vector_length < 0.5 {
-        world.set_cell_external(transform.translation.truncate().as_ivec2(), Cell::from(particle.clone()));
-        return true;
-    }
+    let deltav = particle.velocity;
 
-    // Normalize velocity and convert to i32 for line
-    let normalized_velocity = (particle.velocity / vector_length).as_ivec2();
+    let steps = (deltav.x.abs() + deltav.y.abs()).sqrt() as usize + 1;
+    for s in 0..steps {
+        let n = (s + 1) as f32 / steps as f32;
+        transform.translation += n * deltav.extend(0.) * 0.90;
 
-    let cur_pos = transform.translation.truncate().round().as_ivec2();
-
-    // Find first intersection
-    for i in 0..=(vector_length as i32).abs() {
-        let next_pos = cur_pos + normalized_velocity * i;
-        if is_occupied(world, next_pos) {
-            // Hit occupied cell, stop and consume into last position
-            let last_pos = cur_pos + normalized_velocity * (i - 1);
-            // If last position also occupied, reverse velocity and try next frame
-            if is_occupied(world, last_pos) {
-                particle.velocity = -particle.velocity * 0.90;
-            } else {
-                world.set_cell_external(last_pos, Cell::from(particle.clone()));
-                return true;
-            }
+        if let Some(cell) = world.get_cell(transform.translation.truncate().as_ivec2()) {
+            match cell.physics {
+                PhysicsType::Empty => {
+                    if s == steps - 1 {
+                        return false;
+                    }
+                },
+                _ => {
+                    if s > 0 {
+                        // Turn into cell
+                        world.set_cell_external(transform.translation.truncate().as_ivec2(), Cell::from(particle.clone()));
+                        return true
+                    } else {
+                        // Go up if blocked
+                        particle.velocity.y = if matches!(particle.physics, PhysicsType::Gas(_)) { -1. } else { 1. };
+                        break;
+                    }
+                }
+            };
         }
     }
-
-    // No intersection found
-    transform.translation += particle.velocity.extend(0.);
     false
 }
 
@@ -96,7 +95,7 @@ fn is_occupied(
     pos: IVec2,
 ) -> bool {
     if let Some(cell) = world.get_cell(pos) {
-        matches!(cell.physics, PhysicsType::HardSolid(_))
+        !matches!(cell.physics, PhysicsType::Empty)
     } else {
         false
     }
