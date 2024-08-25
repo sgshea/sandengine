@@ -1,7 +1,7 @@
 /// Type of rigid bodies that interact with the sand simulation
 
 use bevy::{prelude::*, sprite::Anchor};
-use bevy_rapier2d::{na::RealField, prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity}};
+use bevy_rapier2d::prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity};
 
 use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, PixelSimulation}};
 
@@ -169,8 +169,7 @@ pub fn fill_pixel_component(
                                 // Calculate the center of mass and the velocity at that point on the dpe
                                 let center_of_mass = mass.local_center_of_mass + transform.translation.xy();
                                 let velocity_at_point = velocity.linear_velocity_at_point(pos.as_vec2(), center_of_mass);
-                                let mut normalized_velocity = velocity_at_point.normalize();
-                                normalized_velocity.y *= -1.0;
+                                let normalized_velocity = velocity_at_point.normalize_or_zero() * (velocity_at_point.length() * mass.mass / 1000.);
 
                                 spawn_particle(&mut commands, &Cell::from(cell_type), normalized_velocity, pos.as_vec2());
                                 should_destroy_cell = true;

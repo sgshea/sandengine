@@ -1,6 +1,6 @@
 pub mod particle;
 
-use bevy::{math::NormedVectorSpace, prelude::*};
+use bevy::prelude::*;
 use particle::{Particle, PARTICLE_GRAVITY};
 
 use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld, PixelSimulation}, rigid::dynamic_entity::unfill_pixel_component};
@@ -54,6 +54,11 @@ pub fn update_particles(
 
 /// Apply velocity, return true if particle was consumed and needs to be removed
 fn apply_velocity(particle: &mut Particle, transform: &mut Transform, world: &mut PixelWorld) -> bool {
+    if particle.velocity.length() < 0.4 {
+        world.set_cell_external(transform.translation.xy().as_ivec2(), Cell::from(particle.clone()));
+        return true;
+    }
+
     match particle.physics {
         PhysicsType::Gas(_) => particle.velocity.y += PARTICLE_GRAVITY,
         _ => particle.velocity.y -= PARTICLE_GRAVITY,
@@ -79,24 +84,15 @@ fn apply_velocity(particle: &mut Particle, transform: &mut Transform, world: &mu
                         world.set_cell_external(transform.translation.truncate().as_ivec2(), Cell::from(particle.clone()));
                         return true
                     } else {
-                        // Go up if blocked
+                        // Extra velocity in order to get out of whatever area we are in
                         particle.velocity.y = if matches!(particle.physics, PhysicsType::Gas(_)) { -1. } else { 1. };
+                        particle.velocity.x = if particle.velocity.x >= 0. { -0.4 } else { 0.4 };
                         break;
                     }
                 }
             };
         }
+        particle.velocity *= 0.80;
     }
     false
-}
-
-fn is_occupied(
-    world: &PixelWorld,
-    pos: IVec2,
-) -> bool {
-    if let Some(cell) = world.get_cell(pos) {
-        !matches!(cell.physics, PhysicsType::Empty)
-    } else {
-        false
-    }
 }

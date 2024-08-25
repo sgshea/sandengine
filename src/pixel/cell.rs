@@ -40,17 +40,6 @@ pub(crate) enum PhysicsType {
 }
 
 impl CellType {
-    pub fn cell_mass(&self) -> f64 {
-        match self {
-            CellType::Empty => 0.0,
-            CellType::Sand => 1.0,
-            CellType::Dirt => 1.5,
-            CellType::Stone => 3.0,
-            CellType::Water => 1.0,
-            CellType::Smoke => 0.1,
-        }
-    }
-
     pub fn cell_color(&self) -> [u8; 4] {
         let mut trng = rand::thread_rng();
         match self {
