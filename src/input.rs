@@ -1,11 +1,11 @@
 use bevy::{prelude::*, window::PrimaryWindow};
 use bevy_egui::EguiContexts;
 
-use crate::states::DebugState;
+use crate::{pixel::GameCamera, screen::Screen, states::DebugState};
 
 pub(super) fn plugin(app: &mut App) {
     app.insert_resource(InteractionInformation::default());
-    app.add_systems(Update, (get_position, handle_keyboard_input));
+    app.add_systems(Update, (get_position, handle_keyboard_input).run_if(in_state(Screen::Playing)));
 }
 
 #[derive(Resource, Default)]
@@ -32,7 +32,7 @@ fn get_position(
     mut int: ResMut<InteractionInformation>,
     mut egui_ctx: EguiContexts,
     primary_window: Query<&Window, With<PrimaryWindow>>,
-    camera: Query<(&Camera, &GlobalTransform)>,
+    camera: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
 ) {
     let cursor_screen_position = primary_window.single().cursor_position();
 
@@ -43,5 +43,8 @@ fn get_position(
     }
     let (cam, trans) = camera.single();
 
-    int.mouse_position = cam.viewport_to_world_2d(trans, cursor_screen_position.unwrap()).unwrap();
+    let mouse_position = cam.viewport_to_world_2d(trans, cursor_screen_position.unwrap());
+    if let Some(m_pos) = mouse_position {
+        int.mouse_position = m_pos;
+    }
 }

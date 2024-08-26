@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts};
 use strum::{EnumIter, IntoEnumIterator, VariantNames};
 
-use crate::input::InteractionInformation;
+use crate::{input::InteractionInformation, screen::Screen};
 
 use super::{dynamic_entity::{add_dpe, RigidBodyImageHandle}, rigidbodies::add_non_dynamic_rigidbody};
 
@@ -34,8 +34,7 @@ pub enum PlaceableDynamicEntities {
 
 pub(super) fn plugin(app: &mut App) {
         app.init_resource::<RigidInteraction>();
-        app.add_systems(Update, rigid_interaction_config);
-        app.add_systems(Update, handle_input);
+        app.add_systems(Update, (rigid_interaction_config, handle_input).run_if(in_state(Screen::Playing)));
 }
 
 fn rigid_interaction_config(

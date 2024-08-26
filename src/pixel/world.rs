@@ -1,11 +1,12 @@
 use std::cell::UnsafeCell;
 
-use bevy::{math::{IVec2, UVec2}, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
+use bevy::{math::{IVec2, UVec2}, prelude::Component, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
 
 use super::{cell::Cell, chunk::PixelChunk, chunk_handler::SimulationChunkContext, geometry_helpers::{BoundRect, DIRECTIONS}};
 
 use rand::prelude::SliceRandom;
 
+#[derive(Component)]
 pub struct PixelWorld {
     pub chunk_size: UVec2,
     pub world_size: UVec2,

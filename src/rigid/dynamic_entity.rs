@@ -3,7 +3,7 @@
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_rapier2d::prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity};
 
-use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, PixelSimulation}};
+use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, world::PixelWorld}};
 
 use super::collider_generation::create_convex_collider_from_values;
 
@@ -129,10 +129,10 @@ pub fn load_rigidbody_image(
 /// Fill the world with temporary cells based on the properties of the PixelComponents
 pub fn fill_pixel_component(
     mut commands: Commands,
-    mut sim: Query<&mut PixelSimulation>,
+    mut sim: Query<&mut PixelWorld>,
     mut dpe: Query<(&Transform, &mut PixelComponent, &Velocity, &ReadMassProperties)>,
 ) {
-    let world = &mut sim.single_mut().world;
+    let world = &mut sim.single_mut();
 
     for (transform, mut pixel, velocity, mass) in &mut dpe {
         let angle = transform.rotation.to_euler(EulerRot::XYZ).2;
@@ -192,10 +192,10 @@ pub fn fill_pixel_component(
 
 /// Remove all PixelComponent cells that are marked as filled from the PixelWorld
 pub fn unfill_pixel_component(
-    mut sim: Query<&mut PixelSimulation>,
+    mut sim: Query<&mut PixelWorld>,
     mut dpe: Query<&mut PixelComponent>,
 ) {
-    let world = &mut sim.single_mut().world;
+    let world = &mut sim.single_mut();
 
     for mut pixel in &mut dpe {
         while let Some(pos) = pixel.filled_tracker.pop() {

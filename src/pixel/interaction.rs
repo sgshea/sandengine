@@ -7,10 +7,10 @@ use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
 use crate::input::InteractionInformation;
+use crate::screen::Screen;
 
 use super::cell::{Cell, CellType};
 use super::world::PixelWorld;
-use super::PixelSimulation;
 
 #[derive(Resource)]
 pub struct PixelInteraction {
@@ -31,8 +31,7 @@ impl Default for PixelInteraction {
 
 pub(super) fn plugin(app: &mut App) {
         app.init_resource::<PixelInteraction>();
-        app.add_systems(Update, pixel_interaction_config);
-        app.add_systems(FixedPostUpdate, handle_mouse_input);
+        app.add_systems(Update, (pixel_interaction_config, handle_mouse_input).run_if(in_state(Screen::Playing)));
 }
 
 fn pixel_interaction_config(
@@ -78,14 +77,14 @@ fn place_cells(
 fn handle_mouse_input(
     mouse_buttons: Res<ButtonInput<MouseButton>>,
     keyboard_buttons: Res<ButtonInput<KeyCode>>,
-    mut sim: Query<&mut PixelSimulation>,
+    mut sim: Query<&mut PixelWorld>,
     pxl: ResMut<PixelInteraction>,
     int: Res<InteractionInformation>,
 ) {
     // Don't do anything if we are hovering over UI
     if int.hovering_ui { return; }
 
-    let world = &mut sim.single_mut().world;
+    let world = &mut sim.single_mut();
 
     if mouse_buttons.pressed(MouseButton::Left) {
         // Delete cells if control is held

@@ -15,7 +15,7 @@ use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigFor
 use collider_generation::chunk_collider_generation;
 use dynamic_entity::{fill_pixel_component, load_rigidbody_image, unfill_pixel_component, RigidBodyImageHandle};
 
-use crate::pixel::update_pixel_simulation;
+use crate::{pixel::update_pixel_simulation, screen::Screen, SpawnWorlds};
 
 pub struct SandEngineRigidPlugin;
 
@@ -23,14 +23,12 @@ impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(RigidStorage { colliders: Vec::new() })
             .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
-            .add_systems(FixedPostUpdate, chunk_collider_generation)
             .add_plugins((
                 TnuaRapier2dPlugin::new(FixedUpdate),
                 TnuaControllerPlugin::new(FixedUpdate),
                 TnuaCrouchEnforcerPlugin::new(FixedUpdate),
+                interaction::plugin,
             ))
-            .add_systems(Startup, setup_player)
-            .add_systems(Startup, setup_physics_environment)
             .add_systems(Startup, |mut cfg: ResMut<RapierConfiguration>| {
                 cfg.gravity = Vec2::Y * -9.81;
             })
@@ -40,16 +38,16 @@ impl Plugin for SandEngineRigidPlugin {
             .add_systems(Startup, load_rigidbody_image)
             .add_systems(
                 FixedUpdate.intern(),
-                apply_platformer_controls.in_set(TnuaUserControlsSystemSet),
+                apply_platformer_controls.in_set(TnuaUserControlsSystemSet).run_if(in_state(Screen::Playing)),
             )
             .add_systems(
                 FixedUpdate,
                 (
                     fill_pixel_component.before(update_pixel_simulation),
                     unfill_pixel_component.after(update_pixel_simulation),
-                )
-            )
-            .add_plugins(interaction::plugin);
+                    chunk_collider_generation
+                ).chain().run_if(in_state(Screen::Playing))
+            );
     }
 }
 
@@ -60,15 +58,23 @@ pub struct RigidStorage {
     pub colliders: Vec<Option<Vec<Entity>>>,
 }
 
+pub fn spawn_rigid_world(
+    In(config): In<SpawnWorlds>,
+    mut commands: Commands,
+) {
+    setup_physics_environment(&mut commands);
+    setup_player(&mut commands);
+}
+
 // Setting simple stage
-fn setup_physics_environment(mut commands: Commands) {
+fn setup_physics_environment(commands: &mut Commands) {
     let mut cmd = commands.spawn(Name::new("Floor"));
     cmd.insert(Collider::halfspace(Vec2::Y).unwrap());
     // move the floor to the bottom of the screen
     cmd.insert(Transform::from_xyz(0.0, 0.0, 0.0));
 }
 
-fn setup_player(mut commands: Commands) {
+fn setup_player(commands: &mut Commands) {
 
     let mut cmd = commands.spawn_empty();
     cmd.insert(TransformBundle::from_transform(Transform::from_xyz(

@@ -8,11 +8,10 @@ use bevy_egui::{egui, EguiContexts};
 
 use crate::dev_tools::PixelSimulationDebugUi;
 use crate::input::InteractionInformation;
-use crate::states::DebugState;
+use crate::states::{AppSet, DebugState};
 
 use super::cell::Cell;
 use super::world::PixelWorld;
-use super::PixelSimulation;
 
 #[derive(Resource, Default)]
 struct PixelSimulationDebug {
@@ -34,17 +33,17 @@ struct PixelSimulationDebug {
 
 pub(super) fn plugin(app: &mut App) {
         app.init_resource::<PixelSimulationDebug>();
-        app.add_systems(Update, (pixel_simulation_debug, pixel_simulation_debug_ui).run_if(in_state(DebugState::ShowAll)));
+        app.add_systems(Update, (pixel_simulation_debug, pixel_simulation_debug_ui).run_if(in_state(DebugState::ShowAll)).in_set(AppSet::Update));
         app.init_gizmo_group::<ChunkGizmos>();
-        app.add_systems(PostUpdate, (draw_chunk_gizmos, update_pixel_debug_gizmos).run_if(in_state(DebugState::ShowAll)));
+        app.add_systems(PostUpdate, (draw_chunk_gizmos, update_pixel_debug_gizmos).run_if(in_state(DebugState::ShowAll)).in_set(AppSet::Update));
 }
 
 fn pixel_simulation_debug(
-    sim: Query<&mut PixelSimulation>,
+    sim: Query<&mut PixelWorld>,
     mut dbg: ResMut<PixelSimulationDebug>,
     int: Res<InteractionInformation>,
 ) {
-    let world = &sim.single().world;
+    let world = &sim.single();
 
     let cell_pos = int.mouse_position.as_ivec2();
     dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(world.chunk_size, cell_pos);
@@ -88,9 +87,9 @@ pub struct ChunkGizmos {}
 
 pub fn draw_chunk_gizmos(
     mut chunk_gizmos: Gizmos<ChunkGizmos>,
-    pixel_query: Query<&PixelSimulation>,
+    pixel_query: Query<&PixelWorld>,
 ) {
-    let world = &pixel_query.single().world;
+    let world = &pixel_query.single();
 
     let origin = world.world_size.as_vec2() / 2.;
 
