@@ -13,10 +13,6 @@ use particles::ParticlePlugin;
 use pixel::PixelPlugin;
 use states::DebugState;
 
-const WORLD_SIZE: IVec2 = IVec2::new(256, 256);
-const CHUNKS: IVec2 = IVec2::new(4, 4);
-const CHUNK_SIZE: IVec2 = IVec2::new(WORLD_SIZE.x / CHUNKS.x, WORLD_SIZE.y / CHUNKS.y);
-
 pub struct AppPlugin;
 
 impl Plugin for AppPlugin {

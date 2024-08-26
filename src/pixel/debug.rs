@@ -9,7 +9,6 @@ use bevy_egui::{egui, EguiContexts};
 use crate::dev_tools::PixelSimulationDebugUi;
 use crate::input::InteractionInformation;
 use crate::states::DebugState;
-use crate::{CHUNK_SIZE, WORLD_SIZE};
 
 use super::cell::Cell;
 use super::world::PixelWorld;
@@ -48,8 +47,8 @@ fn pixel_simulation_debug(
     let world = &sim.single().world;
 
     let cell_pos = int.mouse_position.as_ivec2();
-    dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(cell_pos);
-    dbg.chunk_position = PixelWorld::cell_to_chunk_position(cell_pos);
+    dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(world.chunk_size, cell_pos);
+    dbg.chunk_position = PixelWorld::cell_to_chunk_position(world.chunk_size, cell_pos);
     dbg.hovered_cell = world.get_cell(cell_pos);
     dbg.inside_dirty_rect = world.cell_inside_dirty(cell_pos);
 
@@ -91,35 +90,27 @@ pub fn draw_chunk_gizmos(
     mut chunk_gizmos: Gizmos<ChunkGizmos>,
     pixel_query: Query<&PixelSimulation>,
 ) {
-    let origin_x = WORLD_SIZE.x as f32 / 2.0;
-    let origin_y = WORLD_SIZE.y as f32 / 2.0;
+    let world = &pixel_query.single().world;
 
-    let sim = pixel_query.single();
+    let origin = world.world_size.as_vec2() / 2.;
 
-    let awake_chunks = sim.world.get_chunk_dirty_rects();
+    let awake_chunks = world.get_chunk_dirty_rects();
 
     for (pos, rect) in awake_chunks {
         // Calculate position in screen
-        let pos_x = (pos.x as f32 * CHUNK_SIZE.x as f32) - WORLD_SIZE.x as f32 / 2.0;
-        let pos_y = (pos.y as f32 * CHUNK_SIZE.y as f32) - WORLD_SIZE.y as f32 / 2.0;
+        let pos = (pos.as_vec2() * world.chunk_size.as_vec2()) - world.world_size.as_vec2() / 2.;
         
         // Draw light gray outline of chunk
         chunk_gizmos.rect_2d(
-            Vec2::new(
-                origin_x + pos_x + CHUNK_SIZE.x as f32 / 2.,
-                origin_y + pos_y + CHUNK_SIZE.y as f32 / 2.,
-            ),
+            origin + pos + (world.chunk_size.as_vec2() / 2.),
             0.0,
-            CHUNK_SIZE.as_vec2(),
+            world.chunk_size.as_vec2(),
             LIGHT_GRAY,
         );
         // Draw green outline of dirty rect if exists
         if !rect.is_empty() {
             chunk_gizmos.rect_2d(
-                Vec2::new(
-                    origin_x + pos_x,
-                    origin_y + pos_y,
-                ) + rect.center_display(),
+                origin + pos + rect.center_display(),
                 0.0,
                 rect.size().as_vec2(),
                 LIGHT_GREEN,

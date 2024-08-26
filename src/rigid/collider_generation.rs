@@ -21,6 +21,11 @@ pub fn chunk_collider_generation(
     let chunk_width = world.get_chunk_width();
     let chunk_height = world.get_chunk_height();
 
+    // Make sure collider storage initialized with correct amount
+    if rigid_storage.colliders.len() as u32 != world.chunk_amount.x * world.chunk_amount.y {
+        rigid_storage.colliders.resize((world.chunk_amount.x * world.chunk_amount.y) as usize, None);
+    }
+
     for (i, chunk) in world.get_chunks().iter().enumerate() {
         // Skip this chunk if the dirty rect has not changed, keep the existing colliders
         if !chunk.should_update() {
@@ -34,8 +39,8 @@ pub fn chunk_collider_generation(
         // This uses the marching squares algorithm to create contours from the chunk data
         let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
                                                 // Adjust origin based on chunk position
-                                                .x_origin(chunk.position.x * chunk_width)
-                                                .y_origin(chunk.position.y * chunk_height)
+                                                .x_origin(chunk.position.x * world.get_chunk_width() as i32)
+                                                .y_origin(chunk.position.y * world.get_chunk_height() as i32)
                                                 .x_step(1.0)
                                                 .y_step(1.0);
         let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");

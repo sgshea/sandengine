@@ -1,6 +1,4 @@
-use bevy::math::IVec2;
-
-use crate::CHUNK_SIZE;
+use bevy::math::{IVec2, UVec2};
 
 use super::{cell::{Cell, PhysicsType}, geometry_helpers::BoundRect};
 
@@ -13,23 +11,25 @@ pub struct PixelChunk {
 
     // Chunk position
     pub position: IVec2,
+    pub size: UVec2,
 
     pub cells: Vec<Cell>,
 }
 
 impl PixelChunk {
-    pub fn new(width: i32, height: i32, pos_x: i32, pos_y: i32) -> Self {
-        let cells = vec![Cell::default(); (height * width) as usize];
+    pub fn new(size: UVec2, position: IVec2) -> Self {
+        let cells = vec![Cell::default(); (size.x * size.y) as usize];
 
         PixelChunk {
-            position: IVec2 { x: pos_x, y: pos_y },
+            position,
             render_override: 0,
             current_dirty_rect: BoundRect {
                     min: IVec2::ZERO,
                     // We iterate over the range of the BoundRect to the end (inclusive) so we need to subtract 1 to not go out of bounds
-                    max: CHUNK_SIZE - 1,
+                    max: (size - UVec2::ONE).as_ivec2(),
                     },
             previous_dirty_rect: BoundRect::empty(),
+            size,
             cells,
         }
     }
@@ -39,7 +39,7 @@ impl PixelChunk {
     }
 
     pub fn get_index(&self, x: i32, y: i32) -> usize {
-        (y * CHUNK_SIZE.x + x) as usize
+        (y * self.size.x as i32 + x) as usize
     }
 
     pub fn get_cell(&self, position: IVec2) -> Cell {

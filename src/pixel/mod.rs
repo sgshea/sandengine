@@ -9,7 +9,7 @@ pub mod interaction;
 
 use bevy::{prelude::*, render::camera::ScalingMode};
 
-use crate::{pixel::world::PixelWorld, rigid::SandEngineRigidPlugin, MainCamera, CHUNKS, WORLD_SIZE};
+use crate::{pixel::world::PixelWorld, rigid::SandEngineRigidPlugin, MainCamera};
 
 pub struct PixelPlugin;
 
@@ -47,17 +47,17 @@ fn setup_pixel_simulation(
     commands.spawn((Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::AutoMin {
-                min_width: WORLD_SIZE.x as f32,
-                min_height: WORLD_SIZE.y as f32,
+                min_width: 256.,
+                min_height: 256.,
             },
             near: -1000.0,
             ..default()
         },
-        transform: Transform::from_xyz(WORLD_SIZE.x as f32 / 2.0, WORLD_SIZE.y as f32 / 2.0, 1000.0),
+        transform: Transform::from_xyz(256. / 2.0, 256. / 2.0, 1000.0),
         ..default()
     }, MainCamera));
 
-    let world = PixelWorld::new(WORLD_SIZE.x, WORLD_SIZE.y, CHUNKS.x, CHUNKS.y);
+    let world = PixelWorld::new(UVec2 { x: 256, y: 256 }, UVec2 { x: 4, y: 4 });
 
     commands.spawn((
         PixelSimulation {

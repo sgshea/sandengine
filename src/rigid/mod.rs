@@ -17,13 +17,11 @@ use dynamic_entity::{fill_pixel_component, load_rigidbody_image, unfill_pixel_co
 
 use crate::pixel::update_pixel_simulation;
 
-use super::CHUNKS;
-
 pub struct SandEngineRigidPlugin;
 
 impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(RigidStorage::default())
+        app.insert_resource(RigidStorage { colliders: Vec::new() })
             .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
             .add_systems(FixedPostUpdate, chunk_collider_generation)
             .add_plugins((
@@ -60,16 +58,6 @@ impl Plugin for SandEngineRigidPlugin {
 pub struct RigidStorage {
     // Static colliders generated from the pixel simulation
     pub colliders: Vec<Option<Vec<Entity>>>,
-    // Dynamic colliders that interact with the pixel simulation
-    // pub rigidbodies: Vec<Entity>,
-}
-
-impl Default for RigidStorage {
-    fn default() -> Self {
-        Self {
-            colliders: vec![None; CHUNKS.x as usize * CHUNKS.y as usize],
-        }
-    }
 }
 
 // Setting simple stage

@@ -1,19 +1,15 @@
 use std::cell::UnsafeCell;
 
-use bevy::{math::IVec2, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
+use bevy::{math::{IVec2, UVec2}, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
 
-use crate::{pixel::chunk_handler::SimulationChunkContext, CHUNK_SIZE};
-
-use super::{cell::Cell, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS}};
+use super::{cell::Cell, chunk::PixelChunk, chunk_handler::SimulationChunkContext, geometry_helpers::{BoundRect, DIRECTIONS}};
 
 use rand::prelude::SliceRandom;
 
 pub struct PixelWorld {
-    c_height: i32,
-    c_width: i32,
-
-    chunks_x: i32,
-    chunks_y: i32,
+    pub chunk_size: UVec2,
+    pub world_size: UVec2,
+    pub chunk_amount: UVec2,
 
     pub chunks: HashMap<IVec2, PixelChunk>,
 
@@ -22,20 +18,19 @@ pub struct PixelWorld {
 
 impl PixelWorld {
 
-    pub fn new(t_width: i32, t_height: i32, chunks_x: i32, chunks_y: i32) -> Self {
+    pub fn new(world_size: UVec2, chunk_amount: UVec2) -> Self {
         let mut new_world = PixelWorld {
-            c_height: t_height / chunks_x,
-            c_width: t_width / chunks_y,
-            chunks_x,
-            chunks_y,
+            chunk_amount,
+            world_size,
+            chunk_size: world_size / chunk_amount,
             chunks: HashMap::new(),
             iteration: 0
         };
 
         // create chunks
-        for x in 0..new_world.chunks_x {
-            for y in 0..new_world.chunks_y {
-                new_world.create_chunk(x, y);
+        for x in 0..new_world.chunk_amount.x {
+            for y in 0..new_world.chunk_amount.y {
+                new_world.create_chunk(x as i32, y as i32);
             }
         }
 
@@ -55,16 +50,16 @@ impl PixelWorld {
     }
 
     fn create_chunk(&mut self, x: i32, y: i32) {
-        let chunk = PixelChunk::new(self.c_width, self.c_height, x, y);
+        let chunk = PixelChunk::new(self.chunk_size, IVec2 { x, y });
         self.chunks.insert(IVec2 { x, y }, chunk);
     }
 
-    pub fn get_chunk_width(&self) -> i32 {
-        self.c_width
+    pub fn get_chunk_width(&self) -> u32 {
+        self.chunk_size.x
     }
 
-    pub fn get_chunk_height(&self) -> i32 {
-        self.c_height
+    pub fn get_chunk_height(&self) -> u32 {
+        self.chunk_size.y
     }
 
     pub fn get_chunks(&self) -> Vec<&PixelChunk> {
@@ -98,28 +93,28 @@ impl PixelWorld {
         self.chunks.get_mut(&position)
     }
 
-    pub fn cell_to_chunk_position(position: IVec2) -> IVec2 {
-        position.div_euclid(CHUNK_SIZE)
+    pub fn cell_to_chunk_position(chunk_size: UVec2, position: IVec2) -> IVec2 {
+        position.div_euclid(chunk_size.as_ivec2())
     }
 
-    pub fn cell_to_position_in_chunk(position: IVec2) -> IVec2 {
-        let chunk_position = Self::cell_to_chunk_position(position);
+    pub fn cell_to_position_in_chunk(chunk_size: UVec2, position: IVec2) -> IVec2 {
+        let chunk_position = Self::cell_to_chunk_position(chunk_size, position);
 
-        position - chunk_position * CHUNK_SIZE.x
+        position - chunk_position * chunk_size.x as i32
     }
 
     pub fn get_cell(&self, position: IVec2) -> Option<Cell> {
-        let chunk = self.chunk(Self::cell_to_chunk_position(position))?;
+        let chunk = self.chunk(Self::cell_to_chunk_position(self.chunk_size, position))?;
 
-        let local = Self::cell_to_position_in_chunk(position);
+        let local = Self::cell_to_position_in_chunk(self.chunk_size, position);
         Some(chunk.get_cell(local))
     }
 
     pub fn cell_inside_dirty(&self, position: IVec2) -> bool {
-        let chunk = self.chunk(Self::cell_to_chunk_position(position));
+        let chunk = self.chunk(Self::cell_to_chunk_position(self.chunk_size, position));
 
         if let Some(chunk) = chunk {
-            let local = Self::cell_to_position_in_chunk(position);
+            let local = Self::cell_to_position_in_chunk(self.chunk_size, position);
 
             return chunk.current_dirty_rect.contains(&local)
         }
@@ -129,11 +124,12 @@ impl PixelWorld {
     /// Sets the value of a cell in this chunk, if it exists.
     /// Makes sure that the chunk is marked as dirty if it wasn't already.
     pub fn set_cell_external(&mut self, position: IVec2, cell: Cell) {
-        let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(position)) else {
+        let chunk_size = self.chunk_size.clone();
+        let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(chunk_size, position)) else {
             return;
         };
 
-        let local = Self::cell_to_position_in_chunk(position);
+        let local = Self::cell_to_position_in_chunk(chunk_size, position);
         chunk.set_cell(local.x, local.y, cell);
 
         chunk.render_override = 3;
@@ -182,6 +178,7 @@ impl PixelWorld {
                             let mut scc = SimulationChunkContext::new(
                                 *pos,
                                 arr.try_into().unwrap(),
+                                self.chunk_size,
                             );
                         taskpool.scope(|s| {
                             s.spawn(async move {

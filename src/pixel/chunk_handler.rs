@@ -2,10 +2,8 @@
 //! It contains functions to help translate positions while updating and dealing with updating neighboring chunk data
 use std::cell::UnsafeCell;
 
-use bevy::{math::IVec2, utils::hashbrown::HashMap};
+use bevy::{math::{IVec2, UVec2}, utils::hashbrown::HashMap};
 use rand::Rng;
-
-use crate::CHUNK_SIZE;
 
 use super::{cell::{Cell, PhysicsType}, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS, VEC_DOWN, VEC_DOWN_LEFT, VEC_DOWN_RIGHT, VEC_LEFT, VEC_RIGHT, VEC_UP}};
 
@@ -17,6 +15,8 @@ pub struct SimulationChunkContext<'a> {
 
     // List of updated positions for each chunk
     pub dirty_updates: HashMap<IVec2, Vec<IVec2>>,
+
+    chunk_size: UVec2,
 }
 
 unsafe impl Send for SimulationChunkContext<'_> {}
@@ -24,12 +24,12 @@ unsafe impl Sync for SimulationChunkContext<'_> {}
 
 impl SimulationChunkContext<'_> {
 
-    pub fn new<'a>(center_position: IVec2, data: [Option<&'a UnsafeCell<PixelChunk>>; 9]) -> SimulationChunkContext<'a> {
+    pub fn new<'a>(center_position: IVec2, data: [Option<&'a UnsafeCell<PixelChunk>>; 9], chunk_size: UVec2) -> SimulationChunkContext<'a> {
         let mut dirty_updates = HashMap::new();
         for direction in DIRECTIONS {
             dirty_updates.insert(center_position + direction, Vec::new());
         }
-        SimulationChunkContext { center_position, data, dirty_updates }
+        SimulationChunkContext { center_position, data, dirty_updates, chunk_size }
     }
 
     fn get_rect(&self, chunk: usize) -> BoundRect {
@@ -56,12 +56,13 @@ impl SimulationChunkContext<'_> {
     }
 
     fn local_to_indices(
+        &self,
         pos: IVec2
     ) -> (usize, usize) {
         // Get the relative chunk position in the 3x3 group
-        let rel_chunk = pos.div_euclid(CHUNK_SIZE);
+        let rel_chunk = pos.div_euclid(self.chunk_size.as_ivec2());
         // Get cell position inside the chunk and convert into 1d position
-        let cell_pos = Self::cell_index(CHUNK_SIZE.x as usize, pos.rem_euclid(CHUNK_SIZE));
+        let cell_pos = Self::cell_index(self.chunk_size.x as usize, pos.rem_euclid(self.chunk_size.as_ivec2()));
 
         (
             ((rel_chunk.x + 1) + (rel_chunk.y + 1) * 3) as usize,
@@ -70,17 +71,17 @@ impl SimulationChunkContext<'_> {
     }
 
     fn get_cell(&self, pos: IVec2) -> &Cell {
-        self.cell_from_index(Self::local_to_indices(pos))
+        self.cell_from_index(self.local_to_indices(pos))
     }
 
     fn cell_is_empty(&self, pos: IVec2) -> bool {
-        let rel_chunk = pos.div_euclid(CHUNK_SIZE);
+        let rel_chunk = pos.div_euclid(self.chunk_size.as_ivec2());
         let chunk = (rel_chunk.x + 1) as usize + (rel_chunk.y + 1) as usize * 3;
         match self.data[chunk] {
             Some(ch) => {
-                let cell_pos = pos.rem_euclid(CHUNK_SIZE).as_uvec2();
+                let cell_pos = pos.rem_euclid(self.chunk_size.as_ivec2()).as_uvec2();
                 let ch = unsafe { &*ch.get() };
-                let cell = ch.cells[(cell_pos.x + cell_pos.y * CHUNK_SIZE.x as u32) as usize];
+                let cell = ch.cells[(cell_pos.x + cell_pos.y * self.chunk_size.x) as usize];
                 cell.is_empty() && cell.updated == false
             },
             None => false,
@@ -107,44 +108,44 @@ impl SimulationChunkContext<'_> {
     }
 
     fn set_cell(&mut self, pos: IVec2, cell: Cell)  {
-        let idx = Self::local_to_indices(pos);
+        let idx = self.local_to_indices(pos);
         self.set_cell_from_index(idx, cell);
         self.update_dirty_idx(pos);
         // If the cell is on the side, update the adjacent chunks dirty rect
         if pos.x == 0 {
             self.update_dirty_idx(pos + IVec2::X * -1);
-        } else if pos.x == CHUNK_SIZE.x as i32 - 1 {
+        } else if pos.x == self.chunk_size.x as i32 - 1 {
             self.update_dirty_idx(pos + IVec2::X);
         }
         if pos.y == 0 {
             self.update_dirty_idx(pos + IVec2::Y * -1);
-        } else if pos.y == CHUNK_SIZE.y as i32 - 1 {
+        } else if pos.y == self.chunk_size.y as i32 - 1 {
             self.update_dirty_idx(pos + IVec2::Y);
         }
     }
 
     fn set_updated_cell(&mut self, pos: IVec2) {
-        let idx = Self::local_to_indices(pos);
+        let idx = self.local_to_indices(pos);
         self.set_updated_cell_from_index(idx);
         self.update_dirty_idx(pos);
         // If the cell is on the side, update the adjacent chunks dirty rect
         if pos.x == 0 {
             self.update_dirty_idx(pos + IVec2::X * -1);
-        } else if pos.x == CHUNK_SIZE.x as i32 - 1 {
+        } else if pos.x == self.chunk_size.x as i32 - 1 {
             self.update_dirty_idx(pos + IVec2::X);
         }
         if pos.y == 0 {
             self.update_dirty_idx(pos + IVec2::Y * -1);
-        } else if pos.y == CHUNK_SIZE.y as i32 - 1 {
+        } else if pos.y == self.chunk_size.y as i32 - 1 {
             self.update_dirty_idx(pos + IVec2::Y);
         }
     }
 
     fn update_dirty_idx(&mut self, pos: IVec2) {
-        let rel_chunk = pos.div_euclid(CHUNK_SIZE);
+        let rel_chunk = pos.div_euclid(self.chunk_size.as_ivec2());
         let chunk_vec = self.dirty_updates.get_mut(&(self.center_position + rel_chunk));
         if let Some(vec) = chunk_vec {
-            vec.push(pos.rem_euclid(CHUNK_SIZE))
+            vec.push(pos.rem_euclid(self.chunk_size.as_ivec2()))
         }
     }
 

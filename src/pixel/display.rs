@@ -1,7 +1,5 @@
 use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}}};
 
-use crate::CHUNK_SIZE;
-
 use super::{LoadedChunks, PixelSimulation};
 
 pub(super) fn plugin(app: &mut App) {
@@ -29,12 +27,12 @@ fn create_chunk_displays(
         if !loaded.chunks.contains(pos) {
             let image = Image::new(
                 Extent3d {
-                    width: CHUNK_SIZE.x as u32,
-                    height: CHUNK_SIZE.y as u32,
+                    width: pxl_sim.get_chunk_width(),
+                    height: pxl_sim.get_chunk_height(),
                     ..default()
                 },
                 TextureDimension::D2,
-                vec![0; (CHUNK_SIZE.x * CHUNK_SIZE.y * 4) as usize],
+                vec![0; (pxl_sim.get_chunk_width() * pxl_sim.get_chunk_height() * 4) as usize],
                     TextureFormat::Rgba8UnormSrgb,
         RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
             );
@@ -42,7 +40,7 @@ fn create_chunk_displays(
                 SpriteBundle {
                     texture: images.add(image),
                     transform: Transform::from_translation(
-                        ((pos.as_vec2() + 0.5) * CHUNK_SIZE.as_vec2()).extend(0.0)
+                        ((pos.as_vec2() + 0.5) * pxl_sim.chunk_size.as_vec2()).extend(0.0)
                     ),
                     sprite: Sprite {
                         flip_y: true,
