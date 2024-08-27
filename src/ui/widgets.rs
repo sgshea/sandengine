@@ -1,6 +1,6 @@
 //! Helper traits for creating common widgets.
 
-use bevy::{ecs::system::EntityCommands, prelude::*, ui::Val::*};
+use bevy::{ecs::system::EntityCommands, prelude::*, render::view::RenderLayers, ui::Val::*};
 
 use super::{interaction::InteractionPalette, palette::*};
 
@@ -36,6 +36,7 @@ impl<T: Spawn> Widgets for T {
                 hovered: BUTTON_HOVERED_BACKGROUND,
                 pressed: BUTTON_PRESSED_BACKGROUND,
             },
+            RenderLayers::layer(5),
         ));
         entity.with_children(|children| {
             children.spawn((
@@ -48,6 +49,7 @@ impl<T: Spawn> Widgets for T {
                         ..default()
                     },
                 ),
+                RenderLayers::layer(5),
             ));
         });
         entity
@@ -67,6 +69,7 @@ impl<T: Spawn> Widgets for T {
                 background_color: BackgroundColor(NODE_BACKGROUND),
                 ..default()
             },
+            RenderLayers::layer(5),
         ));
         entity.with_children(|children| {
             children.spawn((
@@ -79,6 +82,7 @@ impl<T: Spawn> Widgets for T {
                         ..default()
                     },
                 ),
+                RenderLayers::layer(5),
             ));
         });
         entity
@@ -96,6 +100,7 @@ impl<T: Spawn> Widgets for T {
                 },
                 ..default()
             },
+            RenderLayers::layer(5),
         ));
         entity.with_children(|children| {
             children.spawn((
@@ -108,6 +113,7 @@ impl<T: Spawn> Widgets for T {
                         ..default()
                     },
                 ),
+                RenderLayers::layer(5),
             ));
         });
         entity

@@ -17,6 +17,6 @@ pub enum AppSet {
     TickTimers,
     /// Record player input.
     RecordInput,
-    /// Do everything else (consider splitting this into further variants).
+    /// Do everything else
     Update,
 }

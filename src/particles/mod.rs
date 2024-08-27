@@ -1,6 +1,6 @@
 pub mod particle;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::view::RenderLayers};
 use particle::{Particle, PARTICLE_GRAVITY};
 
 use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld}, rigid::dynamic_entity::unfill_pixel_component, screen::Screen};
@@ -36,6 +36,7 @@ pub fn spawn_particle(
             transform: Transform::from_translation(position.extend(1.)),
             ..Default::default()
         },
+        RenderLayers::layer(3),
     ));
 }
 

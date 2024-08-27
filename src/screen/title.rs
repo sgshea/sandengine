@@ -26,6 +26,7 @@ fn enter_title(mut commands: Commands) {
         .ui_root()
         .insert(StateScoped(Screen::Title))
         .with_children(|children| {
+            children.header("Sandengine");
             children.button("Play (Small World)").insert(TitleAction::Play(WorldSizes::Small));
             children.button("Play (Regular World)").insert(TitleAction::Play(WorldSizes::Medium));
             children.button("Play (Huge World)").insert(TitleAction::Play(WorldSizes::Large));
@@ -45,7 +46,7 @@ fn handle_title_action(
         if matches!(interaction, Interaction::Pressed) {
             match action {
                 TitleAction::Play(size) => {
-                   next_screen.set(Screen::Playing);
+                   next_screen.set(Screen::Loading);
                    next_world_size.set(*size);
                 },
 

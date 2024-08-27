@@ -2,7 +2,7 @@
 
 use bevy::{
     prelude::*,
-    render::texture::{ImageLoaderSettings, ImageSampler},
+    render::{texture::{ImageLoaderSettings, ImageSampler}, view::RenderLayers},
 };
 
 use super::Screen;
@@ -75,6 +75,7 @@ fn spawn_splash(mut commands: Commands, asset_server: Res<AssetServer>) {
                     fade_duration: SPLASH_FADE_DURATION_SECS,
                     t: 0.0,
                 },
+                RenderLayers::layer(5),
             ));
         });
 }
@@ -137,6 +138,6 @@ fn tick_splash_timer(time: Res<Time>, mut timer: ResMut<SplashTimer>) {
 
 fn check_splash_timer(timer: ResMut<SplashTimer>, mut next_screen: ResMut<NextState<Screen>>) {
     if timer.0.just_finished() {
-        next_screen.set(Screen::Loading);
+        next_screen.set(Screen::Title);
     }
 }

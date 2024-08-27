@@ -1,6 +1,6 @@
 //! The screen state for the main game loop.
 
-use bevy::{input::common_conditions::input_just_pressed, prelude::*};
+use bevy::{input::common_conditions::input_just_pressed, prelude::*, render::view::RenderLayers};
 
 use crate::{spawn_worlds, WorldSizes};
 
@@ -36,7 +36,8 @@ fn spawn_ui_camera(mut commands: Commands, camera_query: Query<Entity, With<IsDe
                 Name::new("Camera"),
                 Camera2dBundle::default(),
                 IsDefaultUiCamera,
-                StateScoped(Screen::Title)
+                // 5 is render layer for main menu ui
+                RenderLayers::from_layers(&[5]),
             ));
         }
     };

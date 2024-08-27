@@ -1,4 +1,4 @@
-use bevy::{prelude::*, sprite::{MaterialMesh2dBundle, Mesh2dHandle}};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::{MaterialMesh2dBundle, Mesh2dHandle}};
 use bevy_rapier2d::prelude::*;
 
 use crate::screen::Screen;
@@ -45,5 +45,6 @@ pub fn add_non_dynamic_rigidbody(
         ColliderMassProperties::default(),
         Restitution::coefficient(0.7),
         StateScoped(Screen::Playing),
+        RenderLayers::layer(1),
     ));
 }

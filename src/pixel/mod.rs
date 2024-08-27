@@ -7,7 +7,7 @@ pub mod cell;
 pub mod debug;
 pub mod interaction;
 
-use bevy::{prelude::*, render::camera::ScalingMode};
+use bevy::{prelude::*, render::{camera::ScalingMode, view::RenderLayers}};
 
 use crate::{pixel::world::PixelWorld, screen::Screen, SpawnWorlds};
 
@@ -51,8 +51,18 @@ pub fn spawn_pixel_world(
             ..default()
         },
         transform: Transform::from_translation((config.world_size.as_vec2() / 2.).extend(1000.)),
+        camera: Camera {
+            order: 1,
+            ..default()
+        },
         ..default()
-    }).insert((StateScoped(Screen::Playing), GameCamera));
+    })
+    .insert((
+        StateScoped(Screen::Playing),
+        // Layers: 0 (default), 1 (rigidbodies), 2 (cells/pixels), 3 (particles)
+        RenderLayers::from_layers(&[0, 1, 2, 3]),
+        GameCamera
+    ));
 
     let world = PixelWorld::new(config.world_size, config.chunk_amount);
 

@@ -1,6 +1,6 @@
 /// Type of rigid bodies that interact with the sand simulation
 
-use bevy::{prelude::*, sprite::Anchor};
+use bevy::{prelude::*, render::view::RenderLayers, sprite::Anchor};
 use bevy_rapier2d::prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity};
 
 use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, world::PixelWorld}, screen::Screen};
@@ -63,9 +63,10 @@ pub fn add_dpe(
 
     let dpe = DynamicPhysicsEntity::new(position, image, image_handle.clone(), CellType::Stone);
     if let Some(dpe) = dpe {
-        commands.spawn(dpe).insert(
-            StateScoped(Screen::Playing)
-        );
+        commands.spawn(dpe).insert((
+            StateScoped(Screen::Playing),
+            RenderLayers::layer(1),
+        ));
     }
 }
 

@@ -1,4 +1,4 @@
-use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}}};
+use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, view::RenderLayers}};
 
 use crate::screen::Screen;
 
@@ -51,6 +51,7 @@ fn create_chunk_displays(
                 },
                 ChunkDisplayComponent { chunk: *pos },
                 StateScoped(Screen::Playing),
+                RenderLayers::layer(2),
             ));
             loaded.chunks.push(*pos);
         }
