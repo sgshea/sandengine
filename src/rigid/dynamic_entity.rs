@@ -43,7 +43,7 @@ impl DynamicPhysicsEntity {
                         anchor: Anchor::BottomLeft,
                         ..Default::default()
                     },
-                    transform: Transform::from_translation(position.extend(0.)),
+                    transform: Transform::from_translation(position.extend(1.)),
                     ..Default::default()
                 },
             })

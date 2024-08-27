@@ -26,7 +26,7 @@ pub fn add_non_dynamic_rigidbody(
                 MaterialMesh2dBundle {
                     mesh,
                     material: materials.add(Color::hsl((position.x * position.y) as f32, 0.95, 0.7)),
-                    transform: Transform::from_translation(position.extend(0).as_vec3()),
+                    transform: Transform::from_translation(position.extend(1).as_vec3()),
                     ..Default::default()
                 }
             },
@@ -35,7 +35,7 @@ pub fn add_non_dynamic_rigidbody(
                 MaterialMesh2dBundle {
                     mesh,
                     material: materials.add(Color::hsl((position.x * -position.y) as f32, 0.95, 0.7)),
-                    transform: Transform::from_translation(position.extend(0).as_vec3()),
+                    transform: Transform::from_translation(position.extend(1).as_vec3()),
                     ..Default::default()
                 }
             },

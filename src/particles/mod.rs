@@ -33,7 +33,7 @@ pub fn spawn_particle(
                 custom_size: Some(Vec2::new(1., 1.)),
                 ..default()
             },
-            transform: Transform::from_translation(position.extend(1.)),
+            transform: Transform::from_translation(position.extend(3.)),
             ..Default::default()
         },
         RenderLayers::layer(3),

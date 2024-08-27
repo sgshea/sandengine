@@ -1,6 +1,6 @@
-use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, view::RenderLayers}};
+use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, view::RenderLayers}, sprite::{MaterialMesh2dBundle, Mesh2dHandle}};
 
-use crate::screen::Screen;
+use crate::{screen::Screen, SpawnWorlds};
 
 use super::{world::PixelWorld, LoadedChunks};
 
@@ -41,7 +41,7 @@ fn create_chunk_displays(
                 SpriteBundle {
                     texture: images.add(image),
                     transform: Transform::from_translation(
-                        ((pos.as_vec2() + 0.5) * pxl_sim.chunk_size.as_vec2()).extend(0.0)
+                        ((pos.as_vec2() + 0.5) * pxl_sim.chunk_size.as_vec2()).extend(2.)
                     ),
                     sprite: Sprite {
                         flip_y: true,
@@ -71,4 +71,34 @@ fn update_chunk_displays(
             current.data = data;
         }
     }
+}
+
+pub fn setup_gradient_background(
+    commands: &mut Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+    config: &SpawnWorlds,
+) {
+    // Build a default quad mesh
+    let mut mesh = Mesh::from(Rectangle::default());
+    // Build vertex colors for the quad. One entry per vertex (the corners of the quad)
+    let vertex_colors: Vec<[f32; 4]> = vec![
+        LinearRgba::BLUE.to_f32_array(),
+        LinearRgba::BLUE.to_f32_array(),
+        LinearRgba::WHITE.darker(0.1).to_f32_array(),
+        LinearRgba::WHITE.darker(0.1).to_f32_array(),
+    ];
+    // Insert the vertex colors as an attribute
+    mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, vertex_colors);
+
+    let mesh_handle: Mesh2dHandle = meshes.add(mesh).into();
+
+    // Spawn the quad with vertex colors
+    commands.spawn(MaterialMesh2dBundle {
+        mesh: mesh_handle.clone(),
+        transform: Transform::from_translation(Vec3::new(0., 0., 0.))
+            .with_scale((config.world_size.as_vec2() * 4.).extend(0.)),
+        material: materials.add(ColorMaterial::default()),
+        ..default()
+    }).insert(StateScoped(Screen::Playing));
 }

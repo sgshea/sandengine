@@ -8,6 +8,7 @@ pub mod debug;
 pub mod interaction;
 
 use bevy::{prelude::*, render::{camera::ScalingMode, view::RenderLayers}};
+use display::setup_gradient_background;
 
 use crate::{pixel::world::PixelWorld, screen::Screen, SpawnWorlds};
 
@@ -39,6 +40,8 @@ pub struct GameCamera;
 pub fn spawn_pixel_world(
     In(config): In<SpawnWorlds>,
     mut commands: Commands,
+    meshes: ResMut<Assets<Mesh>>,
+    materials: ResMut<Assets<ColorMaterial>>,
     mut loaded_chunks: ResMut<LoadedChunks>,
 ) {
     commands.spawn(Camera2dBundle {
@@ -69,6 +72,8 @@ pub fn spawn_pixel_world(
     commands.spawn(
         world
     ).insert(StateScoped(Screen::Playing));
+
+    setup_gradient_background(&mut commands, meshes, materials, &config);
 
     // Reset loaded chunks
     loaded_chunks.chunks.clear();
