@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 use contour::{Contour, ContourBuilder};
 use geo::{Area, CoordsIter, SimplifyVwPreserve};
 
-use crate::pixel::PixelSimulation;
+use crate::{pixel::world::PixelWorld, screen::Screen};
 
 use super::RigidStorage;
 
@@ -12,11 +12,11 @@ use super::RigidStorage;
 /// If the chunk's dirty rectangle has not changed since the last frame, it will not generate a new collider
 /// Chunk collider generate uses a polyline collider created through a simplified marching squares algorithm
 pub fn chunk_collider_generation(
-    pixel_sim: Query<&mut PixelSimulation>,
+    pixel_sim: Query<&mut PixelWorld>,
     mut rigid_storage: ResMut<RigidStorage>,
     mut commands: Commands,
 ) {
-    let world = &pixel_sim.single().world;
+    let world = &pixel_sim.single();
 
     let chunk_width = world.get_chunk_width();
     let chunk_height = world.get_chunk_height();
@@ -55,7 +55,7 @@ pub fn chunk_collider_generation(
         if !colliders.is_empty() {
             let mut id = vec![];
             for collider in colliders {
-                id.push(commands.spawn(collider).id())
+                id.push(commands.spawn((collider, StateScoped(Screen::Playing))).id())
             }
             rigid_storage.colliders[i] = Some(id);
         } else {

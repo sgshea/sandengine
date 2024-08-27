@@ -1,10 +1,11 @@
 use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}}};
 
-use super::{LoadedChunks, PixelSimulation};
+use crate::screen::Screen;
+
+use super::{world::PixelWorld, LoadedChunks};
 
 pub(super) fn plugin(app: &mut App) {
-
-    app.add_systems(FixedPostUpdate, (create_chunk_displays, update_chunk_displays));
+    app.add_systems(FixedPostUpdate, (create_chunk_displays, update_chunk_displays).run_if(in_state(Screen::Playing)));
 }
 
 #[derive(Component)]
@@ -17,10 +18,10 @@ struct ChunkDisplayComponent {
 fn create_chunk_displays(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
-    pxl_sim: Query<&PixelSimulation>,
+    pxl_sim: Query<&PixelWorld>,
     mut loaded: ResMut<LoadedChunks>,
 ) {
-    let pxl_sim = &pxl_sim.single().world;
+    let pxl_sim = &pxl_sim.single();
 
     // Find all chunks that do not have an image and create one
     for (pos, _chunk) in &pxl_sim.chunks {
@@ -49,6 +50,7 @@ fn create_chunk_displays(
                     ..default()
                 },
                 ChunkDisplayComponent { chunk: *pos },
+                StateScoped(Screen::Playing),
             ));
             loaded.chunks.push(*pos);
         }
@@ -56,11 +58,11 @@ fn create_chunk_displays(
 }
 
 fn update_chunk_displays(
-    pxl_sim: Query<&PixelSimulation>,
+    pxl_sim: Query<&PixelWorld>,
     mut chunks_display: Query<(&ChunkDisplayComponent, &mut Handle<Image>)>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let pxl_sim = &pxl_sim.single().world;
+    let pxl_sim = &pxl_sim.single();
 
     for (chunk_display, handle) in chunks_display.iter_mut() {
         if let Some(data) = pxl_sim.should_render_data(chunk_display.chunk) {

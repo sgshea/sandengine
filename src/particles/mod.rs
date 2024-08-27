@@ -3,7 +3,7 @@ pub mod particle;
 use bevy::prelude::*;
 use particle::{Particle, PARTICLE_GRAVITY};
 
-use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld, PixelSimulation}, rigid::dynamic_entity::unfill_pixel_component};
+use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld}, rigid::dynamic_entity::unfill_pixel_component, screen::Screen};
 
 /// Particle plugin
 /// This plugin uses the same type of cells as the pixel plugin
@@ -14,7 +14,8 @@ impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(FixedUpdate, update_particles
             .after(update_pixel_simulation)
-            .before(unfill_pixel_component));
+            .before(unfill_pixel_component)
+            .run_if(in_state(Screen::Playing)));
     }
 }
 
@@ -41,9 +42,9 @@ pub fn spawn_particle(
 pub fn update_particles(
     mut commands: Commands,
     mut particles: Query<(&mut Particle, &mut Transform, Entity)>,
-    mut pxl: Query<&mut PixelSimulation>,
+    mut pxl: Query<&mut PixelWorld>,
 ) {
-    let world = &mut pxl.single_mut().world;
+    let world = &mut pxl.single_mut();
 
     for (mut particle, mut transform, entity) in particles.iter_mut() {
         if apply_velocity(&mut particle, &mut transform, world) {
