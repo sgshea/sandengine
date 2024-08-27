@@ -3,7 +3,7 @@ use bevy_rapier2d::prelude::*;
 use contour::{Contour, ContourBuilder};
 use geo::{Area, CoordsIter, SimplifyVwPreserve};
 
-use crate::pixel::world::PixelWorld;
+use crate::{pixel::world::PixelWorld, screen::Screen};
 
 use super::RigidStorage;
 
@@ -55,7 +55,7 @@ pub fn chunk_collider_generation(
         if !colliders.is_empty() {
             let mut id = vec![];
             for collider in colliders {
-                id.push(commands.spawn(collider).id())
+                id.push(commands.spawn((collider, StateScoped(Screen::Playing))).id())
             }
             rigid_storage.colliders[i] = Some(id);
         } else {

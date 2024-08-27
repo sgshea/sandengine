@@ -1,6 +1,8 @@
 use bevy::{prelude::*, sprite::{MaterialMesh2dBundle, Mesh2dHandle}};
 use bevy_rapier2d::prelude::*;
 
+use crate::screen::Screen;
+
 use super::interaction::PlaceableRigidBodies;
 
 // Add a simple ball or box rigidbody to the world
@@ -42,5 +44,6 @@ pub fn add_non_dynamic_rigidbody(
         RigidBody::Dynamic,
         ColliderMassProperties::default(),
         Restitution::coefficient(0.7),
+        StateScoped(Screen::Playing),
     ));
 }

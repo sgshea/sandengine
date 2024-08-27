@@ -43,7 +43,10 @@ fn pixel_simulation_debug(
     mut dbg: ResMut<PixelSimulationDebug>,
     int: Res<InteractionInformation>,
 ) {
-    let world = &sim.single();
+    let world = match sim.get_single() {
+        Ok(w) => w,
+        Err(_) => return,
+    };
 
     let cell_pos = int.mouse_position.as_ivec2();
     dbg.position_in_chunk = PixelWorld::cell_to_position_in_chunk(world.chunk_size, cell_pos);
@@ -87,9 +90,12 @@ pub struct ChunkGizmos {}
 
 pub fn draw_chunk_gizmos(
     mut chunk_gizmos: Gizmos<ChunkGizmos>,
-    pixel_query: Query<&PixelWorld>,
+    sim: Query<&PixelWorld>,
 ) {
-    let world = &pixel_query.single();
+    let world = match sim.get_single() {
+        Ok(w) => w,
+        Err(_) => return,
+    };
 
     let origin = world.world_size.as_vec2() / 2.;
 

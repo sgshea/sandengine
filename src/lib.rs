@@ -14,7 +14,6 @@ use bevy_egui::EguiPlugin;
 use particles::ParticlePlugin;
 use pixel::{spawn_pixel_world, PixelPlugin};
 use rigid::{spawn_rigid_world, SandEngineRigidPlugin};
-use screen::Screen;
 use states::{AppSet, DebugState};
 
 pub struct AppPlugin;
@@ -25,6 +24,7 @@ impl Plugin for AppPlugin {
             Update,
             (AppSet::TickTimers, AppSet::RecordInput, AppSet::Update).chain(),
         );
+
         app.add_plugins((DefaultPlugins.set(
             WindowPlugin {
                 primary_window: Some(Window {
@@ -41,31 +41,14 @@ impl Plugin for AppPlugin {
             dev_tools::plugin,
         ))
         .init_state::<DebugState>()
+        .init_state::<WorldSizes>()
         .insert_resource(Time::<Fixed>::from_hz(64.))
         .add_plugins(input::plugin)
         .add_plugins((ui::plugin, screen::plugin))
         .add_plugins(PixelPlugin)
         .add_plugins(SandEngineRigidPlugin)
         .add_plugins(ParticlePlugin);
-
-        app.add_systems(Startup, spawn_camera);
     }
-}
-
-
-fn spawn_camera(mut commands: Commands) {
-    commands.spawn((
-        Name::new("Camera"),
-        Camera2dBundle::default(),
-        // Render all UI to this camera.
-        // Not strictly necessary since we only use one camera,
-        // but if we don't use this component, our UI will disappear as soon
-        // as we add another camera. This includes indirect ways of adding cameras like using
-        // [ui node outlines](https://bevyengine.org/news/bevy-0-14/#ui-node-outline-gizmos)
-        // for debugging. So it's good to have this here for future-proofing.
-        IsDefaultUiCamera,
-        StateScoped(Screen::Title)
-    ));
 }
 
 /// A command to spawn the worlds
@@ -83,9 +66,22 @@ impl Command for SpawnWorlds {
     }
 }
 
-pub fn spawn_worlds(world: &mut World) {
-    SpawnWorlds {
-        world_size: UVec2::new(256, 256),
-        chunk_amount: UVec2::new(4, 4),
-    }.apply(world);
+#[derive(States, Debug, Hash, PartialEq, Eq, Clone, Default, Copy, Reflect)]
+pub enum WorldSizes {
+    Small,
+    #[default]
+    Medium,
+    Large,
+}
+
+pub fn spawn_worlds(commands: &mut Commands, world_size: Res<State<WorldSizes>>) {
+    let (world_size, chunk_amount) = match *world_size.get() {
+        WorldSizes::Small => (UVec2::new(128, 128), UVec2::new(2, 2)),
+        WorldSizes::Medium => (UVec2::new(256, 256), UVec2::new(4, 4)),
+        WorldSizes::Large => (UVec2::new(512, 512), UVec2::new(8, 8)),
+    };
+    commands.add(SpawnWorlds {
+        world_size,
+        chunk_amount
+    });
 }

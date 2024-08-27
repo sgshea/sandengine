@@ -3,7 +3,7 @@
 use bevy::{prelude::*, sprite::Anchor};
 use bevy_rapier2d::prelude::{Collider, ReadMassProperties, Restitution, RigidBody, Velocity};
 
-use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, world::PixelWorld}};
+use crate::{particles::spawn_particle, pixel::{cell::{Cell, CellType, PhysicsType}, world::PixelWorld}, screen::Screen};
 
 use super::collider_generation::create_convex_collider_from_values;
 
@@ -63,7 +63,9 @@ pub fn add_dpe(
 
     let dpe = DynamicPhysicsEntity::new(position, image, image_handle.clone(), CellType::Stone);
     if let Some(dpe) = dpe {
-        commands.spawn(dpe);
+        commands.spawn(dpe).insert(
+            StateScoped(Screen::Playing)
+        );
     }
 }
 

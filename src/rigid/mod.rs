@@ -59,11 +59,15 @@ pub struct RigidStorage {
 }
 
 pub fn spawn_rigid_world(
-    In(config): In<SpawnWorlds>,
+    In(_config): In<SpawnWorlds>,
     mut commands: Commands,
+    mut rigid_storage: ResMut<RigidStorage>,
 ) {
     setup_physics_environment(&mut commands);
     setup_player(&mut commands);
+    
+    // Reset rigid storage
+    rigid_storage.colliders.clear();
 }
 
 // Setting simple stage
@@ -72,6 +76,7 @@ fn setup_physics_environment(commands: &mut Commands) {
     cmd.insert(Collider::halfspace(Vec2::Y).unwrap());
     // move the floor to the bottom of the screen
     cmd.insert(Transform::from_xyz(0.0, 0.0, 0.0));
+    cmd.insert(StateScoped(Screen::Playing));
 }
 
 fn setup_player(commands: &mut Commands) {
@@ -124,4 +129,6 @@ fn setup_player(commands: &mut Commands) {
     // need to cast a shape - which is physics-engine specific. We set the shape using a
     // component.
     cmd.insert(TnuaRapier2dSensorShape(Collider::ball(0.70)));
+
+    cmd.insert(StateScoped(Screen::Playing));
 }

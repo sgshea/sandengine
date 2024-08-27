@@ -38,26 +38,30 @@ pub struct GameCamera;
 
 pub fn spawn_pixel_world(
     In(config): In<SpawnWorlds>,
-    mut commands: Commands
+    mut commands: Commands,
+    mut loaded_chunks: ResMut<LoadedChunks>,
 ) {
     commands.spawn(Camera2dBundle {
         projection: OrthographicProjection {
             scaling_mode: ScalingMode::AutoMin {
-                min_width: 256.,
-                min_height: 256.,
+                min_width: config.world_size.x as f32,
+                min_height: config.world_size.y as f32,
             },
             near: -1000.0,
             ..default()
         },
-        transform: Transform::from_xyz(256. / 2.0, 256. / 2.0, 1000.0),
+        transform: Transform::from_translation((config.world_size.as_vec2() / 2.).extend(1000.)),
         ..default()
     }).insert((StateScoped(Screen::Playing), GameCamera));
 
-    let world = PixelWorld::new(UVec2 { x: 256, y: 256 }, UVec2 { x: 4, y: 4 });
+    let world = PixelWorld::new(config.world_size, config.chunk_amount);
 
     commands.spawn(
         world
     ).insert(StateScoped(Screen::Playing));
+
+    // Reset loaded chunks
+    loaded_chunks.chunks.clear();
 }
 
 pub fn update_pixel_simulation(

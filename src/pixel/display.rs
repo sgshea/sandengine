@@ -50,6 +50,7 @@ fn create_chunk_displays(
                     ..default()
                 },
                 ChunkDisplayComponent { chunk: *pos },
+                StateScoped(Screen::Playing),
             ));
             loaded.chunks.push(*pos);
         }
