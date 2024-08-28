@@ -1,4 +1,6 @@
-use bevy::prelude::*;
+use std::sync::mpsc::channel;
+
+use bevy::{prelude::*, tasks::ComputeTaskPool};
 use bevy_rapier2d::prelude::*;
 use contour::{Contour, ContourBuilder};
 use geo::{Area, CoordsIter, SimplifyVwPreserve};
@@ -26,40 +28,67 @@ pub fn chunk_collider_generation(
         rigid_storage.colliders.resize((world.chunk_amount.x * world.chunk_amount.y) as usize, None);
     }
 
-    for (i, chunk) in world.get_chunks().iter().enumerate() {
-        // Skip this chunk if the dirty rect has not changed, keep the existing colliders
-        if !chunk.should_update() {
-            continue;
-        }
+    let chunks = world.get_chunks().into_iter().enumerate().map(|(i, chunk)| (i, chunk)).collect::<Vec<_>>();
 
-        // Remove existing colliders
-        cleanup_colliders(&mut rigid_storage, i, &mut commands);
+    let (tx, rx) = channel::<(usize, Option<Vec<Collider>>)>();
 
-        // Apply the contour builder to the chunk
-        // This uses the marching squares algorithm to create contours from the chunk data
-        let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
-                                                // Adjust origin based on chunk position
-                                                .x_origin(chunk.position.x * world.get_chunk_width() as i32)
-                                                .y_origin(chunk.position.y * world.get_chunk_height() as i32)
-                                                .x_step(1.0)
-                                                .y_step(1.0);
-        let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
-
-        // Create polyline colliders for each contour
-        let mut colliders: Vec<Collider> = vec![];
-        for contour in contours {
-            colliders.extend(create_polyline_colliders(&contour));
-        }
-
-        // Push colliders, if any were generated, to the storage
-        if !colliders.is_empty() {
-            let mut id = vec![];
-            for collider in colliders {
-                id.push(commands.spawn((collider, StateScoped(Screen::Playing))).id())
+    let mut update_counter = 0;
+    ComputeTaskPool::get().scope(|scope| {
+        for (index, chunk) in chunks {
+            if !chunk.should_update() {
+                continue;
             }
-            rigid_storage.colliders[i] = Some(id);
-        } else {
-            rigid_storage.colliders[i] = None;
+            update_counter += 1;
+            let tx = tx.clone();
+            scope.spawn(async move {
+                // Apply the contour builder to the chunk
+                // This uses the marching squares algorithm to create contours from the chunk data
+                let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
+                                                        // Adjust origin based on chunk position
+                                                        .x_origin(chunk.position.x * world.get_chunk_width() as i32)
+                                                        .y_origin(chunk.position.y * world.get_chunk_height() as i32)
+                                                        .x_step(1.0)
+                                                        .y_step(1.0);
+                let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
+
+                // Create polyline colliders for each contour
+                let mut colliders: Vec<Collider> = vec![];
+                for contour in contours {
+                    colliders.extend(create_polyline_colliders(&contour));
+                }
+
+                // Push colliders, if any were generated, to the storage
+                if !colliders.is_empty() {
+                    let mut id = vec![];
+                    for collider in colliders {
+                        id.push(collider);
+                    }
+                    tx.send((index, Some(id))).unwrap();
+                } else {
+                    tx.send((index, None)).unwrap();
+                }
+            });
+        }
+    });
+
+    for _ in 0..update_counter {
+        let (idx, colliders) = rx.recv().unwrap();
+        // Despawn existing colliders
+        if let Some(entities) = &rigid_storage.colliders[idx] {
+            for e in entities {
+                commands.entity(*e).despawn();
+            }
+        }
+        // Place new colliders in by mapping to new entities
+        match colliders {
+            None => rigid_storage.colliders[idx] = None,
+            Some(colliders) => {
+                // map to entities
+                let entities: Vec<Entity> = colliders.into_iter().map(|c| {
+                    commands.spawn((c, StateScoped(Screen::Playing))).id()
+                }).collect();
+                rigid_storage.colliders[idx] = Some(entities)
+            }
         }
     }
 }
@@ -107,18 +136,4 @@ pub fn create_convex_collider_from_values(values: &[f64], width: f32, height: f3
         return Some(create_convex_collider(contour.unwrap()))
     }
     None
-}
-
-// Remove colliders inside a chunk
-pub fn cleanup_colliders(
-    rigid_storage: &mut ResMut<RigidStorage>,
-    i: usize,
-    commands: &mut Commands,
-) {
-    if let Some(colliders) = &rigid_storage.colliders[i] {
-        for entity in colliders.iter() {
-            commands.entity(*entity).despawn();
-        }
-    }
-    rigid_storage.colliders[i] = None;
 }
