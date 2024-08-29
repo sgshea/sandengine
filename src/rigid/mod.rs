@@ -1,3 +1,6 @@
+//! Rigid body module which implements a plugin that handles rigid bodies created and managed by the Rapier physics engine.
+//! Handles interactions between the rigid bodies and pixel simulation world
+
 mod character_control_tnua;
 mod collider_generation;
 pub mod dynamic_entity;

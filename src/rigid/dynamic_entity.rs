@@ -13,7 +13,8 @@ use crate::{
 
 use super::collider_generation::create_convex_collider_from_values;
 
-/// Bundle which includes physics properties along with the PixelComponent
+// Bundle which includes physics properties along with the PixelComponent
+// A Dynamic physics entity has 2-way interaction with the pixel simulation
 #[derive(Bundle)]
 pub struct DynamicPhysicsEntity {
     // Collider and Rigidbody of Rapier
@@ -21,7 +22,6 @@ pub struct DynamicPhysicsEntity {
     pub rigidbody: RigidBody,
 
     // Modifiable properties of the rigidbody
-    // TODO: custom generation of these properties based on the pixel data
     pub mass: ReadMassProperties,
     pub restitution: Restitution,
     pub velocity: Velocity,
@@ -63,6 +63,7 @@ impl DynamicPhysicsEntity {
     }
 }
 
+// Adds a dynamic physics entity into a position
 pub fn add_dpe(
     commands: &mut Commands,
     images: &Res<Assets<Image>>,

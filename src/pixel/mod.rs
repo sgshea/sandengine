@@ -1,3 +1,7 @@
+//! Pixel module managing the pixel/cell world that runs on a cellular-automata like system
+//! `world.rs` manages this behavior
+//! The plugin also manages input/debug windows for managing the pixel world and spawns the main game camera
+
 pub mod cell;
 mod chunk;
 mod chunk_handler;
@@ -30,6 +34,7 @@ impl Plugin for PixelPlugin {
     }
 }
 
+// Resource which defines which chunks are loaded. Currently only used to know which chunks have an image for display
 #[derive(Resource, Default)]
 pub(crate) struct LoadedChunks {
     pub chunks: Vec<IVec2>,
@@ -38,6 +43,7 @@ pub(crate) struct LoadedChunks {
 #[derive(Component)]
 pub struct GameCamera;
 
+// Spawn's the pixel world and camera
 pub fn spawn_pixel_world(
     In(config): In<SpawnWorlds>,
     mut commands: Commands,
@@ -81,6 +87,7 @@ pub fn spawn_pixel_world(
     loaded_chunks.chunks.clear();
 }
 
+// Update the pixel world
 pub fn update_pixel_simulation(mut query: Query<&mut PixelWorld>) {
     query.single_mut().update();
 }

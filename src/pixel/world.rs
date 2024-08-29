@@ -16,6 +16,7 @@ use super::{
 
 use rand::prelude::SliceRandom;
 
+// Pixel world component which holds the chunks, as well as general information
 #[derive(Component)]
 pub struct PixelWorld {
     pub chunk_size: UVec2,
@@ -28,6 +29,7 @@ pub struct PixelWorld {
 }
 
 impl PixelWorld {
+    // Create a new pixel world based on the total size and how many chunks it should be subdivided into
     pub fn new(world_size: UVec2, chunk_amount: UVec2) -> Self {
         let mut new_world = PixelWorld {
             chunk_amount,
@@ -100,16 +102,19 @@ impl PixelWorld {
         self.chunks.get_mut(&position)
     }
 
+    // Finds the chunk of a given world coordinate
     pub fn cell_to_chunk_position(chunk_size: UVec2, position: IVec2) -> IVec2 {
         position.div_euclid(chunk_size.as_ivec2())
     }
 
+    // Finds the cell position inside of a chunk given a world cell coordinate
     pub fn cell_to_position_in_chunk(chunk_size: UVec2, position: IVec2) -> IVec2 {
         let chunk_position = Self::cell_to_chunk_position(chunk_size, position);
 
         position - chunk_position * chunk_size.x as i32
     }
 
+    // Get a cell based on it's world coordinate
     pub fn get_cell(&self, position: IVec2) -> Option<Cell> {
         let chunk = self.chunk(Self::cell_to_chunk_position(self.chunk_size, position))?;
 
@@ -117,6 +122,7 @@ impl PixelWorld {
         Some(chunk.get_cell(local))
     }
 
+    // Finds if the cell is inside a dirty rectangle of a chunk
     pub fn cell_inside_dirty(&self, position: IVec2) -> bool {
         let chunk = self.chunk(Self::cell_to_chunk_position(self.chunk_size, position));
 
@@ -128,8 +134,8 @@ impl PixelWorld {
         false
     }
 
-    /// Sets the value of a cell in this chunk, if it exists.
-    /// Makes sure that the chunk is marked as dirty if it wasn't already.
+    // Sets the value of a cell in this chunk, if it exists.
+    // Makes sure that the chunk is marked as dirty if it wasn't already.
     pub fn set_cell_external(&mut self, position: IVec2, cell: Cell) {
         let chunk_size = self.chunk_size.clone();
         let Some(chunk) = self.chunk_mut(Self::cell_to_chunk_position(chunk_size, position)) else {
@@ -169,10 +175,12 @@ impl PixelWorld {
         let mut iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
         iterations.shuffle(&mut rng);
 
+        // Count how many chunks get updated so that we know how many dirty rect updates will be recieved through the channel
         let mut update_counter = 0;
         ComputeTaskPool::get().scope(|scope| {
             for iter in iterations {
                 all_pos.iter().for_each(|pos| {
+                    // Calculate if this position should update for this iteration
                     let xx = (pos.x + iter.0) % 2 == 0;
                     let yy = (pos.y + iter.1) % 2 == 0;
                     if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
@@ -180,7 +188,9 @@ impl PixelWorld {
                         let unsafe_chunks = unsafe_cell_chunks.clone();
                         let tx = tx.clone();
                         scope.spawn(async move {
+                            // Send result of this calculation through the channel
                             tx.send({
+                                // Collect the surrounding and center chunk
                                 let arr = DIRECTIONS
                                     .map(|dir| {
                                         let chunk = unsafe_chunks.get(&(*pos + dir));
@@ -192,7 +202,7 @@ impl PixelWorld {
                                     .into_iter()
                                     .collect::<Vec<Option<&SyncUnsafeCell<PixelChunk>>>>();
 
-                                // Simulate a chunk by creating the context and push into the taskpool for simulation
+                                // Simulate a chunk by creating the context for simulation
                                 let mut scc = SimulationChunkContext::new(*pos, arr, chunk_size);
                                 scc.simulate()
                             })
@@ -203,6 +213,7 @@ impl PixelWorld {
             }
         });
 
+        // Recieve through the channel and merge all of the dirty rect updates
         let mut dirty_rect_updates: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
         for _ in 0..update_counter {
             let new_update = rx.recv().unwrap();

@@ -10,6 +10,7 @@ use crate::screen::Screen;
 use super::interaction::PlaceableRigidBodies;
 
 // Add a simple ball or box rigidbody to the world
+// This type of rigid body interacts only 1-way with the pixel simulation
 pub fn add_non_dynamic_rigidbody(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,

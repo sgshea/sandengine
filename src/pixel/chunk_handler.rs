@@ -1,6 +1,3 @@
-//! SimulationChunkContext manages a 3x3 group of chunks temporarily while the updates happen
-//! It contains functions to help translate positions while updating and dealing with updating neighboring chunk data
-
 use bevy::{
     math::{IVec2, UVec2},
     utils::{hashbrown::HashMap, syncunsafecell::SyncUnsafeCell},
@@ -15,6 +12,8 @@ use super::{
     },
 };
 
+// SimulationChunkContext manages a 3x3 group of chunks temporarily while the updates happen
+// It contains functions to help translate positions while updating and dealing with updating neighboring chunk data
 pub struct SimulationChunkContext<'a> {
     // Position of the center chunk in the world's chunk map
     pub center_position: IVec2,
@@ -27,10 +26,8 @@ pub struct SimulationChunkContext<'a> {
     chunk_size: UVec2,
 }
 
-unsafe impl Send for SimulationChunkContext<'_> {}
-unsafe impl Sync for SimulationChunkContext<'_> {}
-
 impl SimulationChunkContext<'_> {
+    // Create the contex using an vector of 3x3 chunks, asserted to be length 9
     pub fn new<'a>(
         center_position: IVec2,
         data: Vec<Option<&'a SyncUnsafeCell<PixelChunk>>>,
@@ -156,6 +153,7 @@ impl SimulationChunkContext<'_> {
         }
     }
 
+    // Simulates the chunks based on the center chunk's dirty rect
     pub fn simulate(&mut self) -> HashMap<IVec2, Vec<IVec2>> {
         const CENTER: usize = 4;
 

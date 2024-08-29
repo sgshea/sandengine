@@ -3,6 +3,7 @@ use strum::{EnumIter, VariantNames};
 
 use crate::particles::particle::Particle;
 
+// A cell of the pixel simulation with a color and physics based on a cell type
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Cell {
     pub color: [u8; 4],
@@ -12,6 +13,7 @@ pub(crate) struct Cell {
     pub updated: bool,
 }
 
+// All the cell types used for the pixel simulation and particle simulation
 #[derive(Clone, Copy, Eq, PartialEq, Debug, EnumIter, VariantNames, Default)]
 pub(crate) enum CellType {
     #[default]
@@ -23,6 +25,7 @@ pub(crate) enum CellType {
     Smoke,
 }
 
+// Different types of physics (movement) behaviors, contains a cell type
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter, Default)]
 pub(crate) enum PhysicsType {
     #[default]
@@ -40,6 +43,7 @@ pub(crate) enum PhysicsType {
 }
 
 impl CellType {
+    // Color, with a slight noise for each cell type
     pub fn cell_color(&self) -> [u8; 4] {
         let mut trng = rand::thread_rng();
         match self {

@@ -1,3 +1,6 @@
+//! Particle module which handles a simple particle plugin.
+//! Particles are created by the pixel/rigid simulations when cells get displaced
+
 pub mod particle;
 
 use bevy::{prelude::*, render::view::RenderLayers};
@@ -30,6 +33,7 @@ impl Plugin for ParticlePlugin {
     }
 }
 
+// Spawn a particle into the ecs world
 pub fn spawn_particle(commands: &mut Commands, cell: &Cell, velocity: Vec2, position: Vec2) {
     commands.spawn((
         Particle::from_cell_with_velocity_position(cell, velocity),
@@ -46,6 +50,7 @@ pub fn spawn_particle(commands: &mut Commands, cell: &Cell, velocity: Vec2, posi
     ));
 }
 
+// Updates all particles by applying velocity on each
 pub fn update_particles(
     mut commands: Commands,
     mut particles: Query<(&mut Particle, &mut Transform, Entity)>,
@@ -66,6 +71,7 @@ fn apply_velocity(
     transform: &mut Transform,
     world: &mut PixelWorld,
 ) -> bool {
+    // If the velocity is small, remove the particle
     if particle.velocity.length() < 0.4 {
         world.set_cell_external(
             transform.translation.xy().as_ivec2(),
@@ -74,6 +80,7 @@ fn apply_velocity(
         return true;
     }
 
+    // Add gravity based on physics
     match particle.physics {
         PhysicsType::Gas(_) => particle.velocity.y += PARTICLE_GRAVITY,
         _ => particle.velocity.y -= PARTICLE_GRAVITY,
@@ -81,9 +88,11 @@ fn apply_velocity(
 
     let deltav = particle.velocity;
 
+    // Evaluate velocity for each step, step length based on the velocity
     let steps = (deltav.x.abs() + deltav.y.abs()).sqrt() as usize + 1;
     for s in 0..steps {
         let n = (s + 1) as f32 / steps as f32;
+        // Add position based on velocity, while also applying some drag
         transform.translation += n * deltav.extend(0.) * 0.90;
 
         if let Some(cell) = world.get_cell(transform.translation.truncate().as_ivec2()) {

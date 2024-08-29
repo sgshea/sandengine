@@ -12,6 +12,7 @@ use crate::screen::Screen;
 use super::cell::{Cell, CellType};
 use super::world::PixelWorld;
 
+// Information about interacting with the pixel world
 #[derive(Resource)]
 pub struct PixelInteraction {
     // Type of cell to be placed on click

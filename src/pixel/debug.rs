@@ -13,6 +13,7 @@ use crate::states::{AppSet, DebugState};
 use super::cell::Cell;
 use super::world::PixelWorld;
 
+// Debug information to be stored for the pixel world
 #[derive(Resource, Default)]
 struct PixelSimulationDebug {
     // Hovered position in chunk coordinates
@@ -102,6 +103,7 @@ fn pixel_simulation_debug_ui(
         });
 }
 
+// Gizmos for dirty rect and chunk borders
 #[derive(Default, Reflect, GizmoConfigGroup)]
 pub struct ChunkGizmos {}
 

@@ -1,3 +1,5 @@
+//! Here all of the plugins from the other modules are setup as well as basic window and bevy information
+
 mod particles;
 mod pixel;
 mod rigid;
@@ -72,6 +74,7 @@ impl Command for SpawnWorlds {
     }
 }
 
+// Different world sizes to use in the spawn world commands
 #[derive(States, Debug, Hash, PartialEq, Eq, Clone, Default, Copy, Reflect)]
 pub enum WorldSizes {
     Small,

@@ -5,8 +5,10 @@ use super::{
     geometry_helpers::BoundRect,
 };
 
+// Single chunk of the pixel world
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
+    // Dirty rectangles, areas which were updated
     pub current_dirty_rect: BoundRect,
     pub previous_dirty_rect: BoundRect,
     // Force chunk to re-render while this value counts down to 0
@@ -16,6 +18,7 @@ pub struct PixelChunk {
     pub position: IVec2,
     pub size: UVec2,
 
+    // Cells of the chunk
     pub cells: Vec<Cell>,
 }
 
@@ -41,6 +44,7 @@ impl PixelChunk {
         !self.current_dirty_rect.is_empty() || self.render_override > 0
     }
 
+    // Convert 2d index to 1d index
     pub fn get_index(&self, x: i32, y: i32) -> usize {
         (y * self.size.x as i32 + x) as usize
     }
@@ -66,6 +70,7 @@ impl PixelChunk {
         }
     }
 
+    // Creates new dirty rect from slice of points
     pub fn construct_dirty_rect(&mut self, points: &[IVec2]) {
         let new_rect = BoundRect::from_points(points);
         self.current_dirty_rect = new_rect;

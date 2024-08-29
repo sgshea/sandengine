@@ -19,13 +19,14 @@ pub(super) fn plugin(app: &mut App) {
     );
 }
 
+// Component used in a bundle with the corresponding display image of a chunk
 #[derive(Component)]
 struct ChunkDisplayComponent {
     pub chunk: IVec2,
 }
 
-/// Creates the chunk textures for each chunk
-/// Can do in runtime (so that we can load/unload chunks later)
+// Creates the chunk textures for each chunk
+// Can do in runtime (so that we can load/unload chunks later)
 fn create_chunk_displays(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
@@ -69,6 +70,7 @@ fn create_chunk_displays(
     }
 }
 
+// Updates all chunk displays if they have updated
 fn update_chunk_displays(
     pxl_sim: Query<&PixelWorld>,
     mut chunks_display: Query<(&ChunkDisplayComponent, &mut Handle<Image>)>,
@@ -84,6 +86,7 @@ fn update_chunk_displays(
     }
 }
 
+// Create a gradient background to be displayed behind the world
 pub fn setup_gradient_background(
     commands: &mut Commands,
     mut meshes: ResMut<Assets<Mesh>>,

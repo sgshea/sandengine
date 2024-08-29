@@ -9,10 +9,10 @@ use crate::{pixel::world::PixelWorld, screen::Screen};
 
 use super::RigidStorage;
 
-/// Generates colliders for the chunks in the pixel simulation
-/// This function will regenerate a collider for each chunk in the simulation and add it to the rigid storage
-/// If the chunk's dirty rectangle has not changed since the last frame, it will not generate a new collider
-/// Chunk collider generate uses a polyline collider created through a simplified marching squares algorithm
+// Generates colliders for the chunks in the pixel simulation
+// This function will regenerate a collider for each chunk in the simulation and add it to the rigid storage
+// If the chunk's dirty rectangle has not changed since the last frame, it will not generate a new collider
+// Chunk collider generate uses a polyline collider created through a simplified marching squares algorithm
 pub fn chunk_collider_generation(
     pixel_sim: Query<&mut PixelWorld>,
     mut rigid_storage: ResMut<RigidStorage>,
