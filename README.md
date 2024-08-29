@@ -3,7 +3,7 @@ Falling sand engine written in rust with bevy.
 
 ## Features
 - Chunked sand simulation in order to use multithreading and 'dirty rectangle' optimization
-- Integration with Rapier physics engine for rigid body physics (currently only 1-way interaction with sand simulation)
+- Integration with Rapier physics engine for rigid body physics with 2-way interaction
 
 # Performance
 See [performance.md](./performance.md)
