@@ -1,6 +1,6 @@
-use std::cell::UnsafeCell;
+use std::sync::mpsc::channel;
 
-use bevy::{math::{IVec2, UVec2}, prelude::Component, tasks::ComputeTaskPool, utils::hashbrown::HashMap};
+use bevy::{math::{IVec2, UVec2}, prelude::Component, tasks::ComputeTaskPool, utils::{hashbrown::HashMap, syncunsafecell::SyncUnsafeCell}};
 
 use super::{cell::Cell, chunk::PixelChunk, chunk_handler::SimulationChunkContext, geometry_helpers::{BoundRect, DIRECTIONS}};
 
@@ -138,16 +138,22 @@ impl PixelWorld {
 
     // Main update function
     pub fn update(&mut self) {
-        let taskpool = ComputeTaskPool::get();
-
         let all_pos = self.all_chunk_pos_should_update();
+        let chunk_size = self.chunk_size;
 
-        // Contains all the new updates, used to contruct dirty rects for next frame
-        let mut dirty_rect_updates: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
+        // Channel for recieving updates to the dirty rects
+        let (tx, rx) = channel::<HashMap<IVec2, Vec<IVec2>>>();
 
+        let mut unsafe_cell_chunks: HashMap<IVec2, &SyncUnsafeCell<PixelChunk>> = HashMap::new();
         for pos in all_pos.clone() {
             if let Some(ch) = self.chunk_mut(pos) {
                 ch.commit_cells_unupdated();
+
+                // Converting to UnsafeCell for sending to threads
+                // # Safety (of this particular part)
+                // a &mut PixelChunk is the same as a &UnsafeCell<PixelChunk>
+                let unsafe_chunk: &SyncUnsafeCell<PixelChunk> = unsafe { std::mem::transmute(ch) };
+                unsafe_cell_chunks.insert(pos, unsafe_chunk);
             }
         }
 
@@ -157,49 +163,53 @@ impl PixelWorld {
         let mut iterations = [(0, 0), (1, 0), (0, 1), (1, 1)];
         iterations.shuffle(&mut rng);
 
-        for iter in iterations {
-            all_pos.iter().for_each(|pos| {
-                    let xx = (pos.x + iter.0) % 2 == 0;
-                    let yy = (pos.y + iter.1) % 2 == 0;
-                if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
-                        let new_updates = {
-                            let arr = DIRECTIONS
-                            .map(|dir|{
-                                let chunk = self.chunk_mut(*pos + dir);
-                                match chunk {
-                                    Some(c) => {
-                                        let cell_chunk: &UnsafeCell<PixelChunk> = unsafe { std::mem::transmute(c) };
-                                        Some(cell_chunk)
-                                    },
-                                    None => None,
-                                }
-                            }).into_iter().collect::<Vec<Option<&UnsafeCell<PixelChunk>>>>();
+        let mut update_counter = 0;
+        ComputeTaskPool::get().scope(|scope| {
+            for iter in iterations {
+                all_pos.iter().for_each(|pos| {
+                        let xx = (pos.x + iter.0) % 2 == 0;
+                        let yy = (pos.y + iter.1) % 2 == 0;
+                    if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
+                        update_counter += 1;
+                        let unsafe_chunks = unsafe_cell_chunks.clone();
+                        let tx = tx.clone();
+                        scope.spawn(async move {
+                            tx.send({
+                                let arr = DIRECTIONS
+                                .map(|dir|{
+                                    let chunk = unsafe_chunks.get(&(*pos + dir));
+                                    match chunk {
+                                        Some(c) => {
+                                            Some(*c)
+                                        },
+                                        None => None,
+                                    }
+                                }).into_iter().collect::<Vec<Option<&SyncUnsafeCell<PixelChunk>>>>();
 
-                            // Simulate a chunk by creating the context and push into the taskpool for simulation
-                            let mut scc = SimulationChunkContext::new(
-                                *pos,
-                                arr.try_into().unwrap(),
-                                self.chunk_size,
-                            );
-                        taskpool.scope(|s| {
-                            s.spawn(async move {
-                            scc.simulate()
-                            })
-                        })
-                        };
-
-                        // Push new updates into dirty rect updates
-                    for i in new_updates {
-                        for (position, cells) in i {
-                            if let Some(existing) = dirty_rect_updates.get_mut(&position) {
-                                existing.extend(cells);
-                            } else {
-                                dirty_rect_updates.insert(position, cells);
-                            }
-                        }
+                                // Simulate a chunk by creating the context and push into the taskpool for simulation
+                                let mut scc = SimulationChunkContext::new(
+                                    *pos,
+                                    arr,
+                                    chunk_size,
+                                );
+                                scc.simulate()
+                            }).unwrap();
+                        });
                     }
+                });
+            }
+        });
+
+        let mut dirty_rect_updates: HashMap<IVec2, Vec<IVec2>> = HashMap::new();
+        for _ in 0..update_counter {
+            let new_update = rx.recv().unwrap();
+            for (position, cells) in new_update {
+                if let Some(existing) = dirty_rect_updates.get_mut(&position) {
+                    existing.extend(cells);
+                } else {
+                    dirty_rect_updates.insert(position, cells);
                 }
-            });
+            }
         }
 
         // Apply dirty rect updates

@@ -1,8 +1,7 @@
 //! SimulationChunkContext manages a 3x3 group of chunks temporarily while the updates happen
 //! It contains functions to help translate positions while updating and dealing with updating neighboring chunk data
-use std::cell::UnsafeCell;
 
-use bevy::{math::{IVec2, UVec2}, utils::hashbrown::HashMap};
+use bevy::{math::{IVec2, UVec2}, utils::{hashbrown::HashMap, syncunsafecell::SyncUnsafeCell}};
 use rand::Rng;
 
 use super::{cell::{Cell, PhysicsType}, chunk::PixelChunk, geometry_helpers::{BoundRect, DIRECTIONS, VEC_DOWN, VEC_DOWN_LEFT, VEC_DOWN_RIGHT, VEC_LEFT, VEC_RIGHT, VEC_UP}};
@@ -11,7 +10,7 @@ pub struct SimulationChunkContext<'a> {
     // Position of the center chunk in the world's chunk map
     pub center_position: IVec2,
     // The nine chunks, including the center chunk (in the fourth position), Chunks are None if there is no neighbor there such as on world boundaries
-    pub data: [Option<&'a UnsafeCell<PixelChunk>>; 9],
+    pub data: Vec<Option<&'a SyncUnsafeCell<PixelChunk>>>,
 
     // List of updated positions for each chunk
     pub dirty_updates: HashMap<IVec2, Vec<IVec2>>,
@@ -24,7 +23,8 @@ unsafe impl Sync for SimulationChunkContext<'_> {}
 
 impl SimulationChunkContext<'_> {
 
-    pub fn new<'a>(center_position: IVec2, data: [Option<&'a UnsafeCell<PixelChunk>>; 9], chunk_size: UVec2) -> SimulationChunkContext<'a> {
+    pub fn new<'a>(center_position: IVec2, data: Vec<Option<&'a SyncUnsafeCell<PixelChunk>>>, chunk_size: UVec2) -> SimulationChunkContext<'a> {
+        assert!(data.len() == 9);
         let mut dirty_updates = HashMap::new();
         for direction in DIRECTIONS {
             dirty_updates.insert(center_position + direction, Vec::new());
@@ -327,71 +327,6 @@ impl SimulationChunkContext<'_> {
             } else {
                 self.set_cell(
                     IVec2 { x: position.x + 1, y: position.y - 1 },
-                    current
-                );
-            }
-            return Some(Cell::default())
-        }
-        None
-    }
-
-    fn move_up_left_right(&mut self, current: Cell, position: IVec2, move_left: bool, move_right: bool) -> Option<Cell> {
-        if move_left && move_right {
-            // choose random direction
-            self.set_cell(
-                IVec2 { 
-                    x: if rand::thread_rng().gen_bool(0.5) { position.x + 1 } else { position.x - 1 },
-                    y: position.y + 1
-                },
-                current,
-            );
-            return Some(Cell::default())
-        } else if move_left {
-            // move 2
-            if rand::thread_rng().gen_bool(0.5)
-                && self.cell_is_empty(
-                    IVec2 {
-                        x: position.x - 2,
-                        y: position.y + 2
-                        },
-                    )
-            {
-                self.set_cell(
-                    IVec2 { x: position.x - 2, y: position.y + 2 },
-                    current
-                );
-                // Set intermediate cell updated
-                self.set_updated_cell(
-                    IVec2 { x: position.x - 1, y: position.y + 1 },
-                );
-            } else {
-                self.set_cell(
-                    IVec2 { x: position.x - 1, y: position.y + 1 },
-                    current
-                );
-            }
-            return Some(Cell::default())
-        } else if move_right {
-            // move 2
-            if rand::thread_rng().gen_bool(0.5)
-                && self.cell_is_empty(
-                    IVec2 {
-                        x: position.x + 2,
-                        y: position.y + 2
-                        },
-                    )
-            {
-                self.set_cell(
-                    IVec2 { x: position.x + 2, y: position.y + 2 },
-                    current
-                );
-                // Set intermediate cell updated
-                self.set_updated_cell(
-                    IVec2 { x: position.x + 1, y: position.y + 1 },
-                );
-            } else {
-                self.set_cell(
-                    IVec2 { x: position.x + 1, y: position.y + 1 },
                     current
                 );
             }
