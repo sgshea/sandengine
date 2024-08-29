@@ -3,6 +3,7 @@
 use bevy::prelude::*;
 
 use bevy::math::IVec2;
+use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
@@ -11,6 +12,7 @@ use crate::screen::Screen;
 
 use super::cell::{Cell, CellType};
 use super::world::PixelWorld;
+use super::GameCamera;
 
 // Information about interacting with the pixel world
 #[derive(Resource)]
@@ -34,7 +36,7 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<PixelInteraction>();
     app.add_systems(
         Update,
-        (pixel_interaction_config, handle_mouse_input).run_if(in_state(Screen::Playing)),
+        (pixel_interaction_config, handle_mouse_input, touch_events).run_if(in_state(Screen::Playing)),
     );
 }
 
@@ -100,6 +102,33 @@ fn handle_mouse_input(
                 pxl.place_cell_amount,
                 pxl.place_cell_type,
             );
+        }
+    }
+}
+
+fn touch_events(
+    mut touch_evr: EventReader<TouchInput>,
+    mut sim: Query<&mut PixelWorld>,
+    pxl: ResMut<PixelInteraction>,
+    camera: Query<(&Camera, &GlobalTransform), With<GameCamera>>,
+) {
+    use bevy::input::touch::TouchPhase;
+    let world = &mut sim.single_mut();
+
+    for ev in touch_evr.read() {
+        match ev.phase {
+            TouchPhase::Started | TouchPhase::Moved => {
+                let (cam, trans) = camera.single();
+                if let Some(position) = cam.viewport_to_world_2d(trans, ev.position) {
+                    place_cells(
+                        world,
+                        position.as_ivec2(),
+                        pxl.place_cell_amount,
+                        pxl.place_cell_type,
+                    );
+                }
+            },
+            _ => {},
         }
     }
 }
