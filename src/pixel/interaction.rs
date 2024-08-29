@@ -30,14 +30,14 @@ impl Default for PixelInteraction {
 }
 
 pub(super) fn plugin(app: &mut App) {
-        app.init_resource::<PixelInteraction>();
-        app.add_systems(Update, (pixel_interaction_config, handle_mouse_input).run_if(in_state(Screen::Playing)));
+    app.init_resource::<PixelInteraction>();
+    app.add_systems(
+        Update,
+        (pixel_interaction_config, handle_mouse_input).run_if(in_state(Screen::Playing)),
+    );
 }
 
-fn pixel_interaction_config(
-    mut ctx: EguiContexts,
-    mut pxl: ResMut<PixelInteraction>,
-) {
+fn pixel_interaction_config(mut ctx: EguiContexts, mut pxl: ResMut<PixelInteraction>) {
     egui::Window::new("Pixel Simulation").show(ctx.ctx_mut(),
         | ui | {
             ui.set_min_width(200.);
@@ -55,12 +55,7 @@ fn pixel_interaction_config(
 }
 
 // Intended to be called with cell type
-fn place_cells(
-    world: &mut PixelWorld,
-    position: IVec2,
-    amount: i32,
-    cell_type: CellType,
-) {
+fn place_cells(world: &mut PixelWorld, position: IVec2, amount: i32, cell_type: CellType) {
     let amt_to_place_quarter = amount / 4;
     let amt_to_place_half = amount / 2;
     for x in -amt_to_place_half..=amt_to_place_half {
@@ -82,16 +77,28 @@ fn handle_mouse_input(
     int: Res<InteractionInformation>,
 ) {
     // Don't do anything if we are hovering over UI
-    if int.hovering_ui { return; }
+    if int.hovering_ui {
+        return;
+    }
 
     let world = &mut sim.single_mut();
 
     if mouse_buttons.pressed(MouseButton::Left) {
         // Delete cells if control is held
         if keyboard_buttons.pressed(KeyCode::ControlLeft) {
-            place_cells(world, int.mouse_position.as_ivec2(), pxl.place_cell_amount, CellType::Empty);
+            place_cells(
+                world,
+                int.mouse_position.as_ivec2(),
+                pxl.place_cell_amount,
+                CellType::Empty,
+            );
         } else {
-            place_cells(world, int.mouse_position.as_ivec2(), pxl.place_cell_amount, pxl.place_cell_type);
+            place_cells(
+                world,
+                int.mouse_position.as_ivec2(),
+                pxl.place_cell_amount,
+                pxl.place_cell_type,
+            );
         }
     }
 }

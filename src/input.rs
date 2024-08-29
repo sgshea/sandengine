@@ -5,7 +5,10 @@ use crate::{pixel::GameCamera, screen::Screen, states::DebugState};
 
 pub(super) fn plugin(app: &mut App) {
     app.insert_resource(InteractionInformation::default());
-    app.add_systems(Update, (get_position, handle_keyboard_input).run_if(in_state(Screen::Playing)));
+    app.add_systems(
+        Update,
+        (get_position, handle_keyboard_input).run_if(in_state(Screen::Playing)),
+    );
 }
 
 #[derive(Resource, Default)]
@@ -39,7 +42,7 @@ fn get_position(
     int.hovering_ui = egui_ctx.ctx_mut().wants_pointer_input();
 
     if cursor_screen_position.is_none() || int.hovering_ui {
-        return
+        return;
     }
     let (cam, trans) = camera.single();
 

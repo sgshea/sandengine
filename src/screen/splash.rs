@@ -2,7 +2,10 @@
 
 use bevy::{
     prelude::*,
-    render::{texture::{ImageLoaderSettings, ImageSampler}, view::RenderLayers},
+    render::{
+        texture::{ImageLoaderSettings, ImageSampler},
+        view::RenderLayers,
+    },
 };
 
 use super::Screen;

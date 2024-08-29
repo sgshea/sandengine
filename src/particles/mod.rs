@@ -3,7 +3,15 @@ pub mod particle;
 use bevy::{prelude::*, render::view::RenderLayers};
 use particle::{Particle, PARTICLE_GRAVITY};
 
-use crate::{pixel::{cell::{Cell, PhysicsType}, update_pixel_simulation, world::PixelWorld}, rigid::dynamic_entity::unfill_pixel_component, screen::Screen};
+use crate::{
+    pixel::{
+        cell::{Cell, PhysicsType},
+        update_pixel_simulation,
+        world::PixelWorld,
+    },
+    rigid::dynamic_entity::unfill_pixel_component,
+    screen::Screen,
+};
 
 /// Particle plugin
 /// This plugin uses the same type of cells as the pixel plugin
@@ -12,19 +20,17 @@ pub struct ParticlePlugin;
 
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, update_particles
-            .after(update_pixel_simulation)
-            .before(unfill_pixel_component)
-            .run_if(in_state(Screen::Playing)));
+        app.add_systems(
+            FixedUpdate,
+            update_particles
+                .after(update_pixel_simulation)
+                .before(unfill_pixel_component)
+                .run_if(in_state(Screen::Playing)),
+        );
     }
 }
 
-pub fn spawn_particle(
-    commands: &mut Commands,
-    cell: &Cell,
-    velocity: Vec2,
-    position: Vec2,
-) {
+pub fn spawn_particle(commands: &mut Commands, cell: &Cell, velocity: Vec2, position: Vec2) {
     commands.spawn((
         Particle::from_cell_with_velocity_position(cell, velocity),
         SpriteBundle {
@@ -55,9 +61,16 @@ pub fn update_particles(
 }
 
 /// Apply velocity, return true if particle was consumed and needs to be removed
-fn apply_velocity(particle: &mut Particle, transform: &mut Transform, world: &mut PixelWorld) -> bool {
+fn apply_velocity(
+    particle: &mut Particle,
+    transform: &mut Transform,
+    world: &mut PixelWorld,
+) -> bool {
     if particle.velocity.length() < 0.4 {
-        world.set_cell_external(transform.translation.xy().as_ivec2(), Cell::from(particle.clone()));
+        world.set_cell_external(
+            transform.translation.xy().as_ivec2(),
+            Cell::from(particle.clone()),
+        );
         return true;
     }
 
@@ -79,15 +92,22 @@ fn apply_velocity(particle: &mut Particle, transform: &mut Transform, world: &mu
                     if s == steps - 1 {
                         return false;
                     }
-                },
+                }
                 _ => {
                     if s > 0 {
                         // Turn into cell
-                        world.set_cell_external(transform.translation.truncate().as_ivec2(), Cell::from(particle.clone()));
-                        return true
+                        world.set_cell_external(
+                            transform.translation.truncate().as_ivec2(),
+                            Cell::from(particle.clone()),
+                        );
+                        return true;
                     } else {
                         // Extra velocity in order to get out of whatever area we are in
-                        particle.velocity.y = if matches!(particle.physics, PhysicsType::Gas(_)) { -1. } else { 1. };
+                        particle.velocity.y = if matches!(particle.physics, PhysicsType::Gas(_)) {
+                            -1.
+                        } else {
+                            1.
+                        };
                         particle.velocity.x = if particle.velocity.x >= 0. { -0.4 } else { 0.4 };
                         break;
                     }

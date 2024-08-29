@@ -44,46 +44,36 @@ impl CellType {
         let mut trng = rand::thread_rng();
         match self {
             CellType::Empty => [0, 0, 0, 0],
-            CellType::Sand => {
-                [
-                    (230 + trng.gen_range(-20..20)) as u8,
-                    (195 + trng.gen_range(-20..20)) as u8,
-                    (92 + trng.gen_range(-20..20)) as u8,
-                    255,
-                ]
-            },
-            CellType::Dirt => {
-                [
-                    (139 + trng.gen_range(-10..10)) as u8,
-                    (69 + trng.gen_range(-10..10)) as u8,
-                    (19 + trng.gen_range(-10..10)) as u8,
-                    255,
-                ]
-            },
-            CellType::Stone => {
-                [
-                    (80 + trng.gen_range(-10..10)) as u8,
-                    (80 + trng.gen_range(-10..10)) as u8,
-                    (80 + trng.gen_range(-10..10)) as u8,
-                    255,
-                ]
-            },
-            CellType::Water => {
-                [
-                    (20 + trng.gen_range(-20..20)) as u8,
-                    (125 + trng.gen_range(-20..20)) as u8,
-                    (205 + trng.gen_range(-20..20)) as u8,
-                    150,
-                ]
-            },
-            CellType::Smoke => {
-                [
-                    (192 + trng.gen_range(-20..20)) as u8,
-                    (192 + trng.gen_range(-20..20)) as u8,
-                    (192 + trng.gen_range(-20..20)) as u8,
-                    150,
-                ]
-            },
+            CellType::Sand => [
+                (230 + trng.gen_range(-20..20)) as u8,
+                (195 + trng.gen_range(-20..20)) as u8,
+                (92 + trng.gen_range(-20..20)) as u8,
+                255,
+            ],
+            CellType::Dirt => [
+                (139 + trng.gen_range(-10..10)) as u8,
+                (69 + trng.gen_range(-10..10)) as u8,
+                (19 + trng.gen_range(-10..10)) as u8,
+                255,
+            ],
+            CellType::Stone => [
+                (80 + trng.gen_range(-10..10)) as u8,
+                (80 + trng.gen_range(-10..10)) as u8,
+                (80 + trng.gen_range(-10..10)) as u8,
+                255,
+            ],
+            CellType::Water => [
+                (20 + trng.gen_range(-20..20)) as u8,
+                (125 + trng.gen_range(-20..20)) as u8,
+                (205 + trng.gen_range(-20..20)) as u8,
+                150,
+            ],
+            CellType::Smoke => [
+                (192 + trng.gen_range(-20..20)) as u8,
+                (192 + trng.gen_range(-20..20)) as u8,
+                (192 + trng.gen_range(-20..20)) as u8,
+                150,
+            ],
         }
     }
 }
@@ -155,7 +145,7 @@ impl From<Particle> for Cell {
         Self {
             color: value.color,
             physics: value.physics,
-            updated: false
+            updated: false,
         }
     }
 }

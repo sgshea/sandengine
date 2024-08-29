@@ -25,10 +25,17 @@ pub fn chunk_collider_generation(
 
     // Make sure collider storage initialized with correct amount
     if rigid_storage.colliders.len() as u32 != world.chunk_amount.x * world.chunk_amount.y {
-        rigid_storage.colliders.resize((world.chunk_amount.x * world.chunk_amount.y) as usize, None);
+        rigid_storage
+            .colliders
+            .resize((world.chunk_amount.x * world.chunk_amount.y) as usize, None);
     }
 
-    let chunks = world.get_chunks().into_iter().enumerate().map(|(i, chunk)| (i, chunk)).collect::<Vec<_>>();
+    let chunks = world
+        .get_chunks()
+        .into_iter()
+        .enumerate()
+        .map(|(i, chunk)| (i, chunk))
+        .collect::<Vec<_>>();
 
     let (tx, rx) = channel::<(usize, Option<Vec<Collider>>)>();
 
@@ -43,13 +50,16 @@ pub fn chunk_collider_generation(
             scope.spawn(async move {
                 // Apply the contour builder to the chunk
                 // This uses the marching squares algorithm to create contours from the chunk data
-                let contour_builder = ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
-                                                        // Adjust origin based on chunk position
-                                                        .x_origin(chunk.position.x * world.get_chunk_width() as i32)
-                                                        .y_origin(chunk.position.y * world.get_chunk_height() as i32)
-                                                        .x_step(1.0)
-                                                        .y_step(1.0);
-                let contours = contour_builder.contours(chunk.cells_as_floats().as_slice(), &[0.5]).expect("Failed to generate contours");
+                let contour_builder =
+                    ContourBuilder::new(chunk_width as usize, chunk_height as usize, false)
+                        // Adjust origin based on chunk position
+                        .x_origin(chunk.position.x * world.get_chunk_width() as i32)
+                        .y_origin(chunk.position.y * world.get_chunk_height() as i32)
+                        .x_step(1.0)
+                        .y_step(1.0);
+                let contours = contour_builder
+                    .contours(chunk.cells_as_floats().as_slice(), &[0.5])
+                    .expect("Failed to generate contours");
 
                 // Create polyline colliders for each contour
                 let mut colliders: Vec<Collider> = vec![];
@@ -84,9 +94,10 @@ pub fn chunk_collider_generation(
             None => rigid_storage.colliders[idx] = None,
             Some(colliders) => {
                 // map to entities
-                let entities: Vec<Entity> = colliders.into_iter().map(|c| {
-                    commands.spawn((c, StateScoped(Screen::Playing))).id()
-                }).collect();
+                let entities: Vec<Entity> = colliders
+                    .into_iter()
+                    .map(|c| commands.spawn((c, StateScoped(Screen::Playing))).id())
+                    .collect();
                 rigid_storage.colliders[idx] = Some(entities)
             }
         }
@@ -101,7 +112,9 @@ fn create_polyline_colliders(contour: &Contour) -> Vec<Collider> {
     for poly in geometry {
         // Try to skip polygons that are too small
         if poly.unsigned_area() > 2.5 {
-            let edge = poly.exterior_coords_iter().map(|p| Vec2::new(p.x as f32, p.y as f32));
+            let edge = poly
+                .exterior_coords_iter()
+                .map(|p| Vec2::new(p.x as f32, p.y as f32));
             edges.push(Collider::polyline(edge.collect(), None));
         }
     }
@@ -115,25 +128,36 @@ fn create_convex_collider(contour: &Contour) -> Collider {
     let mut points: Vec<Vec2> = vec![];
 
     for poly in geometry.iter() {
-        points.extend(poly.exterior_coords_iter().map(|p| Vec2::new(p.x as f32, p.y as f32)).collect::<Vec<_>>());
+        points.extend(
+            poly.exterior_coords_iter()
+                .map(|p| Vec2::new(p.x as f32, p.y as f32))
+                .collect::<Vec<_>>(),
+        );
     }
 
     // We know that the points are sequentially ordered in the contour so we can create indices simply by counting to the next one
-    let indices: Vec<[u32; 2]> = (0..points.len() - 1).map(|i| [i as u32, i as u32 + 1]).collect();
+    let indices: Vec<[u32; 2]> = (0..points.len() - 1)
+        .map(|i| [i as u32, i as u32 + 1])
+        .collect();
 
     Collider::convex_decomposition(&points, &indices)
 }
 
 /// Creates a single compound polyline collider from values
-pub fn create_convex_collider_from_values(values: &[f64], width: f32, height: f32) -> Option<Collider> {
-
+pub fn create_convex_collider_from_values(
+    values: &[f64],
+    width: f32,
+    height: f32,
+) -> Option<Collider> {
     let contour_builder = ContourBuilder::new(width as usize, height as usize, false);
-    let contours = contour_builder.contours(values, &[0.5]).expect("Failed to generate contour");
+    let contours = contour_builder
+        .contours(values, &[0.5])
+        .expect("Failed to generate contour");
 
     // Expect there to be only one contour
     let contour = contours.first();
     if contour.is_some() {
-        return Some(create_convex_collider(contour.unwrap()))
+        return Some(create_convex_collider(contour.unwrap()));
     }
     None
 }

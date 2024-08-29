@@ -1,8 +1,6 @@
 use bevy::prelude::*;
 use bevy_tnua::builtins::{TnuaBuiltinCrouch, TnuaBuiltinCrouchState, TnuaBuiltinDash};
-use bevy_tnua::control_helpers::
-    TnuaSimpleAirActionsCounter
-;
+use bevy_tnua::control_helpers::TnuaSimpleAirActionsCounter;
 use bevy_tnua::math::{Float, Vector3};
 use bevy_tnua::prelude::*;
 
@@ -22,13 +20,8 @@ pub fn apply_platformer_controls(
         &mut TnuaSimpleAirActionsCounter,
     )>,
 ) {
-
     // Get query results
-    let (
-        config,
-        mut controller,
-        mut air_actions_counter,
-    ) = query.single_mut();
+    let (config, mut controller, mut air_actions_counter) = query.single_mut();
 
     // This part is just keyboard input processing. In a real game this would probably be done
     // with a third party plugin.
@@ -43,9 +36,7 @@ pub fn apply_platformer_controls(
 
     direction = direction.clamp_length_max(1.0);
 
-    let jump = {
-        keyboard.any_pressed([KeyCode::Space, KeyCode::ArrowUp, KeyCode::KeyW])
-    };
+    let jump = { keyboard.any_pressed([KeyCode::Space, KeyCode::ArrowUp, KeyCode::KeyW]) };
     let dash = keyboard.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
 
     // This needs to be called once per frame. It lets the air actions counter know about the
@@ -78,9 +69,7 @@ pub fn apply_platformer_controls(
     // `desired_velocity` or `desired_forward` which we compute here based on the current
     // frame's input.
     controller.basis(TnuaBuiltinWalk {
-        desired_velocity: {
-            direction * speed_factor * config.speed
-        },
+        desired_velocity: { direction * speed_factor * config.speed },
         desired_forward: {
             // For platformers, we only want ot change direction when the character tries to
             // moves (or when the player explicitly wants to set the direction)
@@ -134,9 +123,7 @@ pub fn apply_platformer_controls(
             // When set, the `desired_forward` of the dash action "overrides" the
             // `desired_forward` of the walk basis. Like the displacement, it gets "frozen" -
             // allowing to easily maintain a forward direction during the dash.
-            desired_forward: {
-                direction.normalize()
-            },
+            desired_forward: { direction.normalize() },
             allow_in_air: air_actions_counter.air_count_for(TnuaBuiltinDash::NAME)
                 <= config.actions_in_air,
             ..config.dash.clone()

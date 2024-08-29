@@ -1,8 +1,18 @@
 use std::sync::mpsc::channel;
 
-use bevy::{math::{IVec2, UVec2}, prelude::Component, tasks::ComputeTaskPool, utils::{hashbrown::HashMap, syncunsafecell::SyncUnsafeCell}};
+use bevy::{
+    math::{IVec2, UVec2},
+    prelude::Component,
+    tasks::ComputeTaskPool,
+    utils::{hashbrown::HashMap, syncunsafecell::SyncUnsafeCell},
+};
 
-use super::{cell::Cell, chunk::PixelChunk, chunk_handler::SimulationChunkContext, geometry_helpers::{BoundRect, DIRECTIONS}};
+use super::{
+    cell::Cell,
+    chunk::PixelChunk,
+    chunk_handler::SimulationChunkContext,
+    geometry_helpers::{BoundRect, DIRECTIONS},
+};
 
 use rand::prelude::SliceRandom;
 
@@ -18,14 +28,13 @@ pub struct PixelWorld {
 }
 
 impl PixelWorld {
-
     pub fn new(world_size: UVec2, chunk_amount: UVec2) -> Self {
         let mut new_world = PixelWorld {
             chunk_amount,
             world_size,
             chunk_size: world_size / chunk_amount,
             chunks: HashMap::new(),
-            iteration: 0
+            iteration: 0,
         };
 
         // create chunks
@@ -40,13 +49,9 @@ impl PixelWorld {
 
     // Return position of chunk and dirty rect
     pub fn get_chunk_dirty_rects(&self) -> Vec<(IVec2, BoundRect)> {
-        self.chunks.iter()
-            .map(|(key, val)| {
-                (
-                    *key,
-                    val.current_dirty_rect
-                )
-            })
+        self.chunks
+            .iter()
+            .map(|(key, val)| (*key, val.current_dirty_rect))
             .collect()
     }
 
@@ -76,7 +81,7 @@ impl PixelWorld {
         let chunk = self.chunk(position);
         if let Some(c) = chunk {
             if c.should_update() {
-                return Some(c.render_chunk())
+                return Some(c.render_chunk());
             }
         }
         None
@@ -84,7 +89,8 @@ impl PixelWorld {
 
     /// Gets all the chunks that should update and returns their positions
     fn all_chunk_pos_should_update(&self) -> Vec<IVec2> {
-        self.chunks.iter()
+        self.chunks
+            .iter()
             .filter(|&(_, chunk)| chunk.should_update())
             .map(|(&pos, _)| pos)
             .collect()
@@ -117,7 +123,7 @@ impl PixelWorld {
         if let Some(chunk) = chunk {
             let local = Self::cell_to_position_in_chunk(self.chunk_size, position);
 
-            return chunk.current_dirty_rect.contains(&local)
+            return chunk.current_dirty_rect.contains(&local);
         }
         false
     }
@@ -167,8 +173,8 @@ impl PixelWorld {
         ComputeTaskPool::get().scope(|scope| {
             for iter in iterations {
                 all_pos.iter().for_each(|pos| {
-                        let xx = (pos.x + iter.0) % 2 == 0;
-                        let yy = (pos.y + iter.1) % 2 == 0;
+                    let xx = (pos.x + iter.0) % 2 == 0;
+                    let yy = (pos.y + iter.1) % 2 == 0;
                     if xx && yy && self.chunk(*pos).is_some_and(|c| c.should_update()) {
                         update_counter += 1;
                         let unsafe_chunks = unsafe_cell_chunks.clone();
@@ -176,24 +182,21 @@ impl PixelWorld {
                         scope.spawn(async move {
                             tx.send({
                                 let arr = DIRECTIONS
-                                .map(|dir|{
-                                    let chunk = unsafe_chunks.get(&(*pos + dir));
-                                    match chunk {
-                                        Some(c) => {
-                                            Some(*c)
-                                        },
-                                        None => None,
-                                    }
-                                }).into_iter().collect::<Vec<Option<&SyncUnsafeCell<PixelChunk>>>>();
+                                    .map(|dir| {
+                                        let chunk = unsafe_chunks.get(&(*pos + dir));
+                                        match chunk {
+                                            Some(c) => Some(*c),
+                                            None => None,
+                                        }
+                                    })
+                                    .into_iter()
+                                    .collect::<Vec<Option<&SyncUnsafeCell<PixelChunk>>>>();
 
                                 // Simulate a chunk by creating the context and push into the taskpool for simulation
-                                let mut scc = SimulationChunkContext::new(
-                                    *pos,
-                                    arr,
-                                    chunk_size,
-                                );
+                                let mut scc = SimulationChunkContext::new(*pos, arr, chunk_size);
                                 scc.simulate()
-                            }).unwrap();
+                            })
+                            .unwrap();
                         });
                     }
                 });

@@ -1,15 +1,19 @@
-mod pixel;
 mod particles;
+mod pixel;
 mod rigid;
 
 mod input;
 
 mod dev_tools;
+mod screen;
 mod states;
 pub mod ui;
-mod screen;
 
-use bevy::{ecs::{system::RunSystemOnce, world::Command}, prelude::*, window::PresentMode};
+use bevy::{
+    ecs::{system::RunSystemOnce, world::Command},
+    prelude::*,
+    window::PresentMode,
+};
 use bevy_egui::EguiPlugin;
 use particles::ParticlePlugin;
 use pixel::{spawn_pixel_world, PixelPlugin};
@@ -25,18 +29,20 @@ impl Plugin for AppPlugin {
             (AppSet::TickTimers, AppSet::RecordInput, AppSet::Update).chain(),
         );
 
-        app.add_plugins((DefaultPlugins.set(
-            WindowPlugin {
-                primary_window: Some(Window {
-                    title: "Pixel Simulation".to_string(),
-                    present_mode: PresentMode::AutoVsync,
-                    canvas: Some("#bevy".to_string()),
-                    fit_canvas_to_parent: true,
-                    prevent_default_event_handling: true,
+        app.add_plugins((
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Pixel Simulation".to_string(),
+                        present_mode: PresentMode::AutoVsync,
+                        canvas: Some("#bevy".to_string()),
+                        fit_canvas_to_parent: true,
+                        prevent_default_event_handling: true,
+                        ..default()
+                    }),
                     ..default()
-                }),
-                ..default()}
-            ).set(ImagePlugin::default_nearest()),
+                })
+                .set(ImagePlugin::default_nearest()),
             EguiPlugin,
             dev_tools::plugin,
         ))
@@ -82,6 +88,6 @@ pub fn spawn_worlds(commands: &mut Commands, world_size: Res<State<WorldSizes>>)
     };
     commands.add(SpawnWorlds {
         world_size,
-        chunk_amount
+        chunk_amount,
     });
 }

@@ -32,10 +32,20 @@ struct PixelSimulationDebug {
 }
 
 pub(super) fn plugin(app: &mut App) {
-        app.init_resource::<PixelSimulationDebug>();
-        app.add_systems(Update, (pixel_simulation_debug, pixel_simulation_debug_ui).run_if(in_state(DebugState::ShowAll)).in_set(AppSet::Update));
-        app.init_gizmo_group::<ChunkGizmos>();
-        app.add_systems(PostUpdate, (draw_chunk_gizmos, update_pixel_debug_gizmos).run_if(in_state(DebugState::ShowAll)).in_set(AppSet::Update));
+    app.init_resource::<PixelSimulationDebug>();
+    app.add_systems(
+        Update,
+        (pixel_simulation_debug, pixel_simulation_debug_ui)
+            .run_if(in_state(DebugState::ShowAll))
+            .in_set(AppSet::Update),
+    );
+    app.init_gizmo_group::<ChunkGizmos>();
+    app.add_systems(
+        PostUpdate,
+        (draw_chunk_gizmos, update_pixel_debug_gizmos)
+            .run_if(in_state(DebugState::ShowAll))
+            .in_set(AppSet::Update),
+    );
 }
 
 fn pixel_simulation_debug(
@@ -66,8 +76,7 @@ fn pixel_simulation_debug_ui(
 ) {
     egui::Window::new("Pixel Debug")
         .open(&mut dbg_ui.show)
-        .show(ctx.ctx_mut(),
-        | ui | {
+        .show(ctx.ctx_mut(), |ui| {
             ui.set_min_width(200.);
             ui.label(format!("Debug info for pixel sim"));
             ui.label("Toggle Debug window with F1");
@@ -75,23 +84,28 @@ fn pixel_simulation_debug_ui(
             ui.label(format!("Current Chunk: {:?}", dbg.chunk_position));
             ui.label(format!("Current Cell: {:?}", dbg.hovered_cell));
             ui.label(format!("Inside dirty rect?: {:?}", dbg.inside_dirty_rect));
-            ui.label(format!("Cell position in world: {:?}", int.mouse_position.as_ivec2()));
-            ui.label(format!("Cell position in chunk: {:?}", dbg.position_in_chunk));
+            ui.label(format!(
+                "Cell position in world: {:?}",
+                int.mouse_position.as_ivec2()
+            ));
+            ui.label(format!(
+                "Cell position in chunk: {:?}",
+                dbg.position_in_chunk
+            ));
             ui.separator();
-            ui.label(format!("Amount of chunks/chunk size: {:?}/{:?}", dbg.chunk_amount, dbg.chunk_size));
+            ui.label(format!(
+                "Amount of chunks/chunk size: {:?}/{:?}",
+                dbg.chunk_amount, dbg.chunk_size
+            ));
             ui.checkbox(&mut dbg.show_chunk_borders, "Show Chunks (F2)");
             ui.label("Toggle Rapier (Physics) Debug Overlay with F3");
-        }
-    );
+        });
 }
 
 #[derive(Default, Reflect, GizmoConfigGroup)]
 pub struct ChunkGizmos {}
 
-pub fn draw_chunk_gizmos(
-    mut chunk_gizmos: Gizmos<ChunkGizmos>,
-    sim: Query<&PixelWorld>,
-) {
+pub fn draw_chunk_gizmos(mut chunk_gizmos: Gizmos<ChunkGizmos>, sim: Query<&PixelWorld>) {
     let world = match sim.get_single() {
         Ok(w) => w,
         Err(_) => return,
@@ -104,7 +118,7 @@ pub fn draw_chunk_gizmos(
     for (pos, rect) in awake_chunks {
         // Calculate position in screen
         let pos = (pos.as_vec2() * world.chunk_size.as_vec2()) - world.world_size.as_vec2() / 2.;
-        
+
         // Draw light gray outline of chunk
         chunk_gizmos.rect_2d(
             origin + pos + (world.chunk_size.as_vec2() / 2.),

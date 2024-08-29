@@ -1,6 +1,9 @@
 use bevy::math::{IVec2, UVec2};
 
-use super::{cell::{Cell, PhysicsType}, geometry_helpers::BoundRect};
+use super::{
+    cell::{Cell, PhysicsType},
+    geometry_helpers::BoundRect,
+};
 
 #[derive(Debug, Clone)]
 pub struct PixelChunk {
@@ -24,10 +27,10 @@ impl PixelChunk {
             position,
             render_override: 0,
             current_dirty_rect: BoundRect {
-                    min: IVec2::ZERO,
-                    // We iterate over the range of the BoundRect to the end (inclusive) so we need to subtract 1 to not go out of bounds
-                    max: (size - UVec2::ONE).as_ivec2(),
-                    },
+                min: IVec2::ZERO,
+                // We iterate over the range of the BoundRect to the end (inclusive) so we need to subtract 1 to not go out of bounds
+                max: (size - UVec2::ONE).as_ivec2(),
+            },
             previous_dirty_rect: BoundRect::empty(),
             size,
             cells,
@@ -88,19 +91,23 @@ impl PixelChunk {
         // Map each cell to a float depending on if it is solid
         // range 0.0-1.0
 
-        self.cells.iter().map(|cell| {
-            if cell.physics == PhysicsType::Empty {
-                0.0
-            } else {
-                1.0
-            }
-        }).collect::<Vec<f64>>()
+        self.cells
+            .iter()
+            .map(|cell| {
+                if cell.physics == PhysicsType::Empty {
+                    0.0
+                } else {
+                    1.0
+                }
+            })
+            .collect::<Vec<f64>>()
     }
 
     // Convert the grid to a byte array for rendering
     pub fn render_chunk(&self) -> Vec<u8> {
-        self.cells.iter().flat_map(|cell| {
-            cell.color
-        }).collect::<Vec<u8>>()
+        self.cells
+            .iter()
+            .flat_map(|cell| cell.color)
+            .collect::<Vec<u8>>()
     }
 }

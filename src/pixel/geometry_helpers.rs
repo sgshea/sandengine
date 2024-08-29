@@ -29,7 +29,6 @@ pub struct BoundRect {
 }
 
 impl BoundRect {
-
     pub fn empty() -> Self {
         BoundRect {
             min: IVec2::MAX,
@@ -38,12 +37,14 @@ impl BoundRect {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.min == IVec2::MAX && self.max == IVec2::MIN || self.min.x > self.max.x || self.min.y > self.max.y
+        self.min == IVec2::MAX && self.max == IVec2::MIN
+            || self.min.x > self.max.x
+            || self.min.y > self.max.y
     }
 
     pub fn from_points(points: &[IVec2]) -> Self {
         if points.len() == 0 {
-            return Self::empty()
+            return Self::empty();
         }
 
         // Find min and max
@@ -53,10 +54,7 @@ impl BoundRect {
             min = IVec2::min(min, *point);
             max = IVec2::max(max, *point);
         }
-        Self {
-            min,
-            max
-        }
+        Self { min, max }
     }
 
     pub fn union(&self, other: &Self) -> Self {
@@ -71,10 +69,7 @@ impl BoundRect {
         let min = IVec2::min(self.min, other.min);
         let max = IVec2::max(self.max, other.max);
 
-        Self {
-            min,
-            max
-        }
+        Self { min, max }
     }
 
     pub fn union_point(&self, point: &IVec2) -> Self {
@@ -116,14 +111,14 @@ impl BoundRect {
     }
 
     pub fn contains(&self, point: &IVec2) -> bool {
-        point.x >= self.min.x && point.y >= self.min.y && point.x <= self.max.x && point.y <= self.max.y
+        point.x >= self.min.x
+            && point.y >= self.min.y
+            && point.x <= self.max.x
+            && point.y <= self.max.y
     }
 
     pub fn center(&self) -> IVec2 {
-        IVec2::new(
-            (self.min.x + self.max.x) / 2,
-            (self.min.y + self.max.y) / 2
-        )
+        IVec2::new((self.min.x + self.max.x) / 2, (self.min.y + self.max.y) / 2)
     }
 
     // We need to offset when displaying the rect
@@ -133,9 +128,6 @@ impl BoundRect {
     }
 
     pub fn size(&self) -> IVec2 {
-        IVec2::new(
-            self.max.x - self.min.x,
-            self.max.y - self.min.y
-        )
+        IVec2::new(self.max.x - self.min.x, self.max.y - self.min.y)
     }
 }

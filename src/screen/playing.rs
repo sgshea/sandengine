@@ -30,7 +30,7 @@ fn return_to_title_screen(mut next_screen: ResMut<NextState<Screen>>) {
 fn spawn_ui_camera(mut commands: Commands, camera_query: Query<Entity, With<IsDefaultUiCamera>>) {
     // Make sure camera does not already exist
     match camera_query.get_single() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(_) => {
             commands.spawn((
                 Name::new("Camera"),

@@ -1,19 +1,27 @@
-mod collider_generation;
 mod character_control_tnua;
-mod rigidbodies;
+mod collider_generation;
 pub mod dynamic_entity;
 mod interaction;
+mod rigidbodies;
 
 use std::f32::consts::FRAC_PI_4;
 
-use bevy::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
+use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
-use bevy_tnua::{builtins::{TnuaBuiltinJump, TnuaBuiltinWalk}, control_helpers::{TnuaCrouchEnforcer, TnuaCrouchEnforcerPlugin, TnuaSimpleAirActionsCounter}, controller::{TnuaControllerBundle, TnuaControllerPlugin}, math::Vector3, TnuaGhostSensor, TnuaToggle, TnuaUserControlsSystemSet};
+use bevy_tnua::{
+    builtins::{TnuaBuiltinJump, TnuaBuiltinWalk},
+    control_helpers::{TnuaCrouchEnforcer, TnuaCrouchEnforcerPlugin, TnuaSimpleAirActionsCounter},
+    controller::{TnuaControllerBundle, TnuaControllerPlugin},
+    math::Vector3,
+    TnuaGhostSensor, TnuaToggle, TnuaUserControlsSystemSet,
+};
 use bevy_tnua_rapier2d::{TnuaRapier2dIOBundle, TnuaRapier2dPlugin, TnuaRapier2dSensorShape};
 use character_control_tnua::{apply_platformer_controls, CharacterMotionConfigForPlatformer};
 use collider_generation::chunk_collider_generation;
-use dynamic_entity::{fill_pixel_component, load_rigidbody_image, unfill_pixel_component, RigidBodyImageHandle};
+use dynamic_entity::{
+    fill_pixel_component, load_rigidbody_image, unfill_pixel_component, RigidBodyImageHandle,
+};
 
 use crate::{pixel::update_pixel_simulation, screen::Screen, SpawnWorlds};
 
@@ -21,33 +29,37 @@ pub struct SandEngineRigidPlugin;
 
 impl Plugin for SandEngineRigidPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(RigidStorage { colliders: Vec::new() })
-            .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
-            .add_plugins((
-                TnuaRapier2dPlugin::new(FixedUpdate),
-                TnuaControllerPlugin::new(FixedUpdate),
-                TnuaCrouchEnforcerPlugin::new(FixedUpdate),
-                interaction::plugin,
-            ))
-            .add_systems(Startup, |mut cfg: ResMut<RapierConfiguration>| {
-                cfg.gravity = Vec2::Y * -9.81;
-            })
-            .insert_resource(RigidBodyImageHandle {
-                handle: None,
-            })
-            .add_systems(Startup, load_rigidbody_image)
-            .add_systems(
-                FixedUpdate.intern(),
-                apply_platformer_controls.in_set(TnuaUserControlsSystemSet).run_if(in_state(Screen::Playing)),
+        app.insert_resource(RigidStorage {
+            colliders: Vec::new(),
+        })
+        .add_plugins(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(1.))
+        .add_plugins((
+            TnuaRapier2dPlugin::new(FixedUpdate),
+            TnuaControllerPlugin::new(FixedUpdate),
+            TnuaCrouchEnforcerPlugin::new(FixedUpdate),
+            interaction::plugin,
+        ))
+        .add_systems(Startup, |mut cfg: ResMut<RapierConfiguration>| {
+            cfg.gravity = Vec2::Y * -9.81;
+        })
+        .insert_resource(RigidBodyImageHandle { handle: None })
+        .add_systems(Startup, load_rigidbody_image)
+        .add_systems(
+            FixedUpdate.intern(),
+            apply_platformer_controls
+                .in_set(TnuaUserControlsSystemSet)
+                .run_if(in_state(Screen::Playing)),
+        )
+        .add_systems(
+            FixedUpdate,
+            (
+                fill_pixel_component.before(update_pixel_simulation),
+                unfill_pixel_component.after(update_pixel_simulation),
+                chunk_collider_generation,
             )
-            .add_systems(
-                FixedUpdate,
-                (
-                    fill_pixel_component.before(update_pixel_simulation),
-                    unfill_pixel_component.after(update_pixel_simulation),
-                    chunk_collider_generation
-                ).chain().run_if(in_state(Screen::Playing))
-            );
+                .chain()
+                .run_if(in_state(Screen::Playing)),
+        );
     }
 }
 
@@ -65,7 +77,7 @@ pub fn spawn_rigid_world(
 ) {
     setup_physics_environment(&mut commands);
     setup_player(&mut commands);
-    
+
     // Reset rigid storage
     rigid_storage.colliders.clear();
 }
@@ -80,7 +92,6 @@ fn setup_physics_environment(commands: &mut Commands) {
 }
 
 fn setup_player(commands: &mut Commands) {
-
     let mut cmd = commands.spawn_empty();
     cmd.insert(TransformBundle::from_transform(Transform::from_xyz(
         30.0, 10.0, 0.0,
@@ -114,7 +125,7 @@ fn setup_player(commands: &mut Commands) {
     cmd.insert(TnuaToggle::default());
     cmd.insert(LockedAxes::ROTATION_LOCKED);
 
-     // `TnuaCrouchEnforcer` can be used to prevent the character from standing up when obstructed.
+    // `TnuaCrouchEnforcer` can be used to prevent the character from standing up when obstructed.
     cmd.insert(TnuaCrouchEnforcer::new(0.5 * Vector3::Y, |cmd| {
         // It needs a sensor shape because it needs to do a shapecast upwards. Without a sensor shape
         // it'd do a raycast.

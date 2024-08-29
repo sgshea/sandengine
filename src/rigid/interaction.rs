@@ -6,7 +6,10 @@ use strum::{EnumIter, IntoEnumIterator, VariantNames};
 
 use crate::{input::InteractionInformation, screen::Screen};
 
-use super::{dynamic_entity::{add_dpe, RigidBodyImageHandle}, rigidbodies::add_non_dynamic_rigidbody};
+use super::{
+    dynamic_entity::{add_dpe, RigidBodyImageHandle},
+    rigidbodies::add_non_dynamic_rigidbody,
+};
 
 #[derive(Resource, Default)]
 pub struct RigidInteraction {
@@ -33,29 +36,31 @@ pub enum PlaceableDynamicEntities {
 }
 
 pub(super) fn plugin(app: &mut App) {
-        app.init_resource::<RigidInteraction>();
-        app.add_systems(Update, (rigid_interaction_config, handle_input).run_if(in_state(Screen::Playing)));
+    app.init_resource::<RigidInteraction>();
+    app.add_systems(
+        Update,
+        (rigid_interaction_config, handle_input).run_if(in_state(Screen::Playing)),
+    );
 }
 
-fn rigid_interaction_config(
-    mut ctx: EguiContexts,
-    mut rgd: ResMut<RigidInteraction>,
-) {
-    egui::Window::new("Rigid Body Simulation").show(ctx.ctx_mut(),
-        | ui | {
-            ui.set_min_width(100.);
-            ui.label("Right Click to place a Dynamic Physics Body");
-            for (dpe_type, name) in PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter()) {
-                ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
-            }
-            ui.separator();
-            ui.label("L-CTRL + Right Click to place a generic physics body");
-            for (rigid_type, name) in PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter()) {
-                ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
-            }
-            ui.label("Press F1 to toggle debug window");
+fn rigid_interaction_config(mut ctx: EguiContexts, mut rgd: ResMut<RigidInteraction>) {
+    egui::Window::new("Rigid Body Simulation").show(ctx.ctx_mut(), |ui| {
+        ui.set_min_width(100.);
+        ui.label("Right Click to place a Dynamic Physics Body");
+        for (dpe_type, name) in
+            PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter())
+        {
+            ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
         }
-    );
+        ui.separator();
+        ui.label("L-CTRL + Right Click to place a generic physics body");
+        for (rigid_type, name) in
+            PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter())
+        {
+            ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
+        }
+        ui.label("Press F1 to toggle debug window");
+    });
 }
 
 fn handle_input(
@@ -76,10 +81,22 @@ fn handle_input(
             if keyboard_buttons.pressed(KeyCode::ShiftLeft) {
                 // Add 10
                 for _ in 0..10 {
-                    add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+                    add_non_dynamic_rigidbody(
+                        &mut commands,
+                        &mut meshes,
+                        &mut materials,
+                        int.mouse_position.as_ivec2(),
+                        rgd.place_rigid_type,
+                    );
                 }
             } else {
-                add_non_dynamic_rigidbody(&mut commands, &mut meshes, &mut materials, int.mouse_position.as_ivec2(), rgd.place_rigid_type);
+                add_non_dynamic_rigidbody(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    int.mouse_position.as_ivec2(),
+                    rgd.place_rigid_type,
+                );
             }
         } else {
             if keyboard_buttons.pressed(KeyCode::ShiftLeft) {

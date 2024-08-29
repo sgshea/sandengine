@@ -1,11 +1,22 @@
-use bevy::{prelude::*, render::{render_asset::RenderAssetUsages, render_resource::{Extent3d, TextureDimension, TextureFormat}, view::RenderLayers}, sprite::{MaterialMesh2dBundle, Mesh2dHandle}};
+use bevy::{
+    prelude::*,
+    render::{
+        render_asset::RenderAssetUsages,
+        render_resource::{Extent3d, TextureDimension, TextureFormat},
+        view::RenderLayers,
+    },
+    sprite::{MaterialMesh2dBundle, Mesh2dHandle},
+};
 
 use crate::{screen::Screen, SpawnWorlds};
 
 use super::{world::PixelWorld, LoadedChunks};
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(FixedPostUpdate, (create_chunk_displays, update_chunk_displays).run_if(in_state(Screen::Playing)));
+    app.add_systems(
+        FixedPostUpdate,
+        (create_chunk_displays, update_chunk_displays).run_if(in_state(Screen::Playing)),
+    );
 }
 
 #[derive(Component)]
@@ -34,14 +45,14 @@ fn create_chunk_displays(
                 },
                 TextureDimension::D2,
                 vec![0; (pxl_sim.get_chunk_width() * pxl_sim.get_chunk_height() * 4) as usize],
-                    TextureFormat::Rgba8UnormSrgb,
-        RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+                TextureFormat::Rgba8UnormSrgb,
+                RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
             );
             commands.spawn((
                 SpriteBundle {
                     texture: images.add(image),
                     transform: Transform::from_translation(
-                        ((pos.as_vec2() + 0.5) * pxl_sim.chunk_size.as_vec2()).extend(2.)
+                        ((pos.as_vec2() + 0.5) * pxl_sim.chunk_size.as_vec2()).extend(2.),
                     ),
                     sprite: Sprite {
                         flip_y: true,
@@ -94,11 +105,13 @@ pub fn setup_gradient_background(
     let mesh_handle: Mesh2dHandle = meshes.add(mesh).into();
 
     // Spawn the quad with vertex colors
-    commands.spawn(MaterialMesh2dBundle {
-        mesh: mesh_handle.clone(),
-        transform: Transform::from_translation(Vec3::new(0., 0., 0.))
-            .with_scale((config.world_size.as_vec2() * 4.).extend(0.)),
-        material: materials.add(ColorMaterial::default()),
-        ..default()
-    }).insert(StateScoped(Screen::Playing));
+    commands
+        .spawn(MaterialMesh2dBundle {
+            mesh: mesh_handle.clone(),
+            transform: Transform::from_translation(Vec3::new(0., 0., 0.))
+                .with_scale((config.world_size.as_vec2() * 4.).extend(0.)),
+            material: materials.add(ColorMaterial::default()),
+            ..default()
+        })
+        .insert(StateScoped(Screen::Playing));
 }
