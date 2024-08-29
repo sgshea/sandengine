@@ -75,13 +75,10 @@ fn pixel_simulation_debug_ui(
     mut dbg_ui: ResMut<PixelSimulationDebugUi>,
     int: Res<InteractionInformation>,
 ) {
-    egui::Window::new("Pixel Debug")
+    egui::Window::new("Debug")
         .open(&mut dbg_ui.show)
         .show(ctx.ctx_mut(), |ui| {
             ui.set_min_width(200.);
-            ui.label(format!("Debug info for pixel sim"));
-            ui.label("Toggle Debug window with F1");
-            ui.separator();
             ui.label(format!("Current Chunk: {:?}", dbg.chunk_position));
             ui.label(format!("Current Cell: {:?}", dbg.hovered_cell));
             ui.label(format!("Inside dirty rect?: {:?}", dbg.inside_dirty_rect));
@@ -98,8 +95,8 @@ fn pixel_simulation_debug_ui(
                 "Amount of chunks/chunk size: {:?}/{:?}",
                 dbg.chunk_amount, dbg.chunk_size
             ));
-            ui.checkbox(&mut dbg.show_chunk_borders, "Show Chunks (F2)");
-            ui.label("Toggle Rapier (Physics) Debug Overlay with F3");
+            ui.checkbox(&mut dbg.show_chunk_borders, "F2: Toggle chunk overlay, gray outline for chunks,\ngreen outline for dirty rectangles");
+            ui.label("F3: Toggle Rapier Physics Engine Debug Overlay");
         });
 }
 

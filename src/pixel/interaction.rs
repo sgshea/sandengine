@@ -3,7 +3,6 @@
 use bevy::prelude::*;
 
 use bevy::math::IVec2;
-use bevy::window::PrimaryWindow;
 use bevy_egui::{egui, EguiContexts};
 use strum::{IntoEnumIterator, VariantNames};
 
@@ -36,25 +35,36 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<PixelInteraction>();
     app.add_systems(
         Update,
-        (pixel_interaction_config, handle_mouse_input, touch_events).run_if(in_state(Screen::Playing)),
+        (pixel_interaction_config, handle_mouse_input, touch_events)
+            .run_if(in_state(Screen::Playing)),
     );
 }
 
 fn pixel_interaction_config(mut ctx: EguiContexts, mut pxl: ResMut<PixelInteraction>) {
-    egui::Window::new("Pixel Simulation").show(ctx.ctx_mut(),
-        | ui | {
-            ui.set_min_width(200.);
-            ui.label("Controls:");
-            ui.label("Left click to place the selected cell type below");
-            ui.label("Hold left control and press left click to erase the selected cell type or select empty");
-            ui.separator();
-            for (cell_type, name) in CellType::iter().zip(CellType::VARIANTS.iter()) {
-                ui.radio_value(&mut pxl.place_cell_type, cell_type, *name);
-            }
+    egui::Window::new("Pixel Simulation Controls").show(ctx.ctx_mut(), |ui| {
+        ui.horizontal(|ui| {
+            ui.group(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("Controls:");
+                    ui.label("Left click: Place selected cell material.");
+                    ui.label("Left Control + Left click: Erase cell material.");
 
-            ui.add(egui::Slider::new(&mut pxl.place_cell_amount, 8..=100).text("Size of brush"));
-        }
-    );
+                    ui.label("Size of cell placement brush:");
+                    ui.add(egui::Slider::new(&mut pxl.place_cell_amount, 8..=80));
+                    ui.label("Press F1 to toggle debug window.");
+                });
+            });
+
+            ui.group(|ui| {
+                ui.set_min_width(60.);
+                ui.vertical(|ui| {
+                    for (cell_type, name) in CellType::iter().zip(CellType::VARIANTS.iter()) {
+                        ui.radio_value(&mut pxl.place_cell_type, cell_type, *name);
+                    }
+                });
+            });
+        });
+    });
 }
 
 // Intended to be called with cell type
@@ -127,8 +137,8 @@ fn touch_events(
                         pxl.place_cell_type,
                     );
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 }

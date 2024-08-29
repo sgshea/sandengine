@@ -45,21 +45,22 @@ pub(super) fn plugin(app: &mut App) {
 
 fn rigid_interaction_config(mut ctx: EguiContexts, mut rgd: ResMut<RigidInteraction>) {
     egui::Window::new("Rigid Body Simulation").show(ctx.ctx_mut(), |ui| {
-        ui.set_min_width(100.);
-        ui.label("Right Click to place a Dynamic Physics Body");
-        for (dpe_type, name) in
-            PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter())
-        {
-            ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
-        }
-        ui.separator();
-        ui.label("L-CTRL + Right Click to place a generic physics body");
-        for (rigid_type, name) in
-            PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter())
-        {
-            ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
-        }
-        ui.label("Press F1 to toggle debug window");
+        ui.group(|ui| {
+            ui.label("Right click:\nPlace a Dynamic Physics Body");
+            for (dpe_type, name) in
+                PlaceableDynamicEntities::iter().zip(PlaceableDynamicEntities::VARIANTS.iter())
+            {
+                ui.radio_value(&mut rgd.place_dynamic_entity_type, dpe_type, *name);
+            }
+        });
+        ui.group(|ui| {
+            ui.label("Left Control + Right click:\nPlace non-interacting physics body.");
+            for (rigid_type, name) in
+                PlaceableRigidBodies::iter().zip(PlaceableRigidBodies::VARIANTS.iter())
+            {
+                ui.radio_value(&mut rgd.place_rigid_type, rigid_type, *name);
+            }
+        });
     });
 }
 
